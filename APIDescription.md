@@ -404,27 +404,21 @@ var
   Doc: TSCLDocument;
   Config: TConfig;
 begin
-  Serializer := TSCLSerializer.Create;
-  try
-    // Сериализация
-    Config.Host := 'localhost';
-    Config.Port := 8080;
-    Config.Debug := True;
-    Config.Timeout := 30.5;
-    
-    Doc := Serializer.Serialize<TConfig>(Config, 'server');
-    // Документ:
-    // server:
-    //   Host: "localhost"
-    //   Port: 8080
-    //   Debug: true
-    //   Timeout: 30.5
-    
-    // Десериализация
-    Serializer.Deserialize<TConfig>(Doc, Config, 'server');
-  finally
-    Serializer.Free;
-  end;
+  // Сериализация
+  Config.Host := 'localhost';
+  Config.Port := 8080;
+  Config.Debug := True;
+  Config.Timeout := 30.5;
+  
+  Doc := Serializer.Serialize<TConfig>(Config);
+  // Документ:
+  // Host: "localhost"
+  // Port: 8080
+  // Debug: true
+  // Timeout: 30.5
+  
+  // Десериализация
+  Serializer.Deserialize<TConfig>(Doc, Config);
 end;
 ```
 
@@ -493,20 +487,15 @@ var
   Doc: TSCLDocument;
   Serializer: TSCLSerializer;
 begin
-  Serializer := TSCLSerializer.Create;
-  try
-    // Чтение из файла
-    Doc := TSCLReader.ReadFrom('config.scl');
-    Serializer.Deserialize<TAppConfig>(Doc, Config, 'app');
-    
-    // Изменение и сохранение
-    Config.Version := 2;
-    Serializer.Serialize<TAppConfig>(Doc, Config, 'app');
-    
-    TSCLWriter.Create.WriteDocument('config.scl', Doc, TEncoding.UTF8);
-  finally
-    Serializer.Free;
-  end;
+  // Чтение из файла
+  Doc := TSCLReader.ReadFrom('config.scl');
+  Serializer.Deserialize<TAppConfig>(Doc, Config, 'app');
+  
+  // Изменение и сохранение
+  Config.Version := 2;
+  Serializer.Serialize<TAppConfig>(Doc, Config, 'app');
+  
+  TSCLWriter.Create.WriteDocument('config.scl', Doc, TEncoding.UTF8);
 end;
 ```
 
