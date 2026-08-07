@@ -286,6 +286,10 @@ resourcestring
   sMaxHashSizeExceed = 'Превышен максимально допустимый размер хэш-таблицы';
   {$ENDIF}
 
+const
+  FLAG_INLINE = $01;
+  FLAG_DATA   = $02;
+
 var
   SCLNameBuilder: TStringBuffer = nil;
   SCLFormatSettings: TFormatSettings;
@@ -405,7 +409,7 @@ begin
     ntArray:
       if PNodeName <> nil then
         { При попытке добавить в пустой массив узел с именем - массив становится таблицей }
-        if FInfo = 0 then
+        if FSubType and FLAG_DATA = 0 then
         begin
           FType := ntTable;
           { Необходимо узнать индекс нового элемента в хэш-таблице }
@@ -424,7 +428,7 @@ begin
   if FInfo = Smallint.MaxValue then
     raise ESCLError.CreateResFmt(@sTooManyChildItems, [GetPath]);
   { Вложенные массивы и таблицы запрещены для строчных }
-  if (FSubType <> 0) and (AType in [ntArray, ntTable]) then
+  if (FSubType and FLAG_INLINE <> 0) and (AType in [ntArray, ntTable]) then
     raise ESCLError.CreateResFmt(@sNestedInlineError, [GetPath]);
   with PSCLArray(FValue)^ do
   begin
@@ -437,13 +441,15 @@ begin
     FLast := Result;
   end;
   Inc(FInfo);
+  if (FSubType and FLAG_DATA = 0) and (AType <> ntComment) then
+    FSubType := FSubType or FLAG_DATA;
 end;
 
 class function TSCLNode.AddComment(Node: PSCLNode; const Comment: string): PSCLNode;
 begin
   if Node.FParent = nil then
     raise ESCLError.CreateRes(@sNoRootNodeComment);
-  if Node.FParent.FSubType <> 0 then
+  if Node.FParent.FSubType and FLAG_INLINE <> 0 then
     raise Exception.CreateRes(@sNoCommentInInline);
   with TSCLNode.PSCLArray(Node.FParent.FValue)^ do
   begin
@@ -463,7 +469,7 @@ function TSCLNode.AddComment(const Comment: string): PSCLNode;
 begin
   if not (FType in [ntArray, ntTable]) then
     raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [FName, TypeName]);
-  if FSubType <> 0 then
+  if FSubType and FLAG_INLINE <> 0 then
     raise Exception.CreateRes(@sNoCommentInInline);
   with PSCLArray(FValue)^ do
   begin
@@ -492,7 +498,7 @@ end;
 function TSCLNode.AddValue(const AName, Value: string; &Type: TStringType): PSCLNode;
 begin
   { Строчные массивы и таблицы не допускают переноса строк }
-  if (&Type in [stText, stWrapped]) and (FType in [ntEmpty, ntArray, ntTable]) and (FSubType <> 0) then
+  if (&Type in [stText, stWrapped]) and (FType in [ntEmpty, ntArray, ntTable]) and (FSubType and FLAG_INLINE <> 0) then
     raise ESCLError.CreateRes(@sNoTextBlckAllowed);
   { Добавляем строку в текущий узел }
   Result := AddChild(AName, ntString);
@@ -728,8 +734,10 @@ begin
 end;
 
 function TSCLNode.IsInline: Boolean;
+const
+  FLAG_INLINE = FLAG_INLINE; // для inline
 begin
-  Result := (FType in [ntArray, ntTable]) and (FSubType <> 0);
+  Result := (FType in [ntArray, ntTable]) and (FSubType and FLAG_INLINE <> 0);
 end;
 
 function TSCLNode.IsLast: Boolean;
@@ -1054,6 +1062,7 @@ begin
   { Создаём основную таблицу документа и пустую ноду }
   FRootNode.FType := ntArray;
   FRootNode.FValue := Int64(@FRootArray.FParent);
+  FRootArray.FParent := Pointer(Self);
 end;
 
 function TSCLDocument.CreateArray: NativeInt;

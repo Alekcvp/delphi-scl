@@ -199,6 +199,25 @@ asm
   {$ENDIF}
 end;
 
+function SplitComment(const Comment: string): TArray<string>;
+begin
+  if Comment.IsEmpty then Exit(nil);
+  var Source := PPChar(@Comment)^;
+  var Cursor := Source;
+  var Index := 0;
+  repeat
+    while (Cursor^ >= #32) or (Cursor^ = #09) do Inc(Cursor);
+    if Index >= Length(Result) then
+      SetLength(Result, NextPowerOfTwo(Index + 1, 16));
+    Result[Index] := Source.SubString(Cursor);
+    if Cursor^ = #13 then Inc(Cursor);
+    if Cursor^ = #10 then Inc(Cursor);
+    Source := Cursor;
+    Inc(Index);
+  until Cursor^ = #0;
+  SetLength(Result, Index);
+end;
+
 function StringFromCharArray(Buffer: PWideChar; Count: Integer): string; overload; inline;
 begin
   SetString(Result, Buffer, Count);
@@ -746,7 +765,11 @@ begin
   if not (ValueAttributes.State in [vsDontWrite, vsIgnore]) then
   begin
     if ValueAttributes.HasComment then
-      ParentNode.AddComment(ValueAttributes.Comment);
+    begin
+      var Comments := SplitComment(ValueAttributes.Comment);
+      for var Index := 0 to High(Comments) do
+        ParentNode.AddComment(Comments[Index]);
+    end;
     FWriterMap[AType.TypeKind](ParentNode, @ValueAttributes, Data, AType);
   end;
 end;
