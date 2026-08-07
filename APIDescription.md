@@ -184,10 +184,7 @@ begin
       'app:' + sLineBreak +
       '  name: "MyApp"' + sLineBreak +
       '  version: 1' + sLineBreak +
-      '  servers: [' + sLineBreak +
-      '    "server1",' + sLineBreak +
-      '    "server2"' + sLineBreak +
-      '  ]'
+      '  servers: ["server1", "server2"]'
     );
     
     // Или статически
