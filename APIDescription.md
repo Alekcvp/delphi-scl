@@ -495,7 +495,7 @@ begin
   Config.Version := 2;
   Serializer.Serialize<TAppConfig>(Doc, Config, 'app');
   
-  TSCLWriter.Create.WriteDocument('config.scl', Doc, TEncoding.UTF8);
+  TSCLWriter.Create.WriteDocument('config.scl', Doc, TEncoding.UTF8); // утечка памяти, лол
 end;
 ```
 
