@@ -1,4 +1,4 @@
-unit SCL.Writer;
+п»їunit SCL.Writer;
 
 {******************************************************************************}
 {  Delphi-SCL - Simple Config Language Library                                 }
@@ -14,7 +14,7 @@ unit SCL.Writer;
 
 interface
 
-{$Q-} // переполнение не баг, а полезная фича
+{$Q-} // РїРµСЂРµРїРѕР»РЅРµРЅРёРµ РЅРµ Р±Р°Рі, Р° РїРѕР»РµР·РЅР°СЏ С„РёС‡Р°
 
 uses
   {$IFDEF MSWINDOWS} Winapi.Windows, {$ENDIF} System.SysUtils, SCL.Common, SCL.Document;
@@ -48,25 +48,25 @@ type
     procedure SetLineBreaks(const LineBreak: string); inline;
      function WriteDocument(Document: TSCLDocument): string; overload;
     procedure WriteDocument(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding); overload;
-     { Шаг отступа для каждого нового уровня, от 2 до 8 }
+     { РЁР°Рі РѕС‚СЃС‚СѓРїР° РґР»СЏ РєР°Р¶РґРѕРіРѕ РЅРѕРІРѕРіРѕ СѓСЂРѕРІРЅСЏ, РѕС‚ 2 РґРѕ 8 }
      property IndentStep: Integer read FIndentStep write SetIndentStep;
-     { Писать вложенные в массив контейнеры с новой строки }
+     { РџРёСЃР°С‚СЊ РІР»РѕР¶РµРЅРЅС‹Рµ РІ РјР°СЃСЃРёРІ РєРѕРЅС‚РµР№РЅРµСЂС‹ СЃ РЅРѕРІРѕР№ СЃС‚СЂРѕРєРё }
      property LeadArray: Boolean read FLeadArray write FLeadArray;
      property SpaceNodes: Boolean read FSpaceNodes write FSpaceNodes;
-     { Глобальная ширина для переноса строк }
+     { Р“Р»РѕР±Р°Р»СЊРЅР°СЏ С€РёСЂРёРЅР° РґР»СЏ РїРµСЂРµРЅРѕСЃР° СЃС‚СЂРѕРє }
      property WrapWidth: Integer read FWrapWidth write SetWrapWidth;
   end;
 
 implementation
 
 resourcestring
-  s2SmallWrapValue = 'Слишком маленькое значение ширины свёрнутой строки (%d)';
-  sFileWriteError  = 'Ошибка записи "%s". %s';
-  sInvalidIndntStp = 'Отступ уровня вложенности должен находиться в диапазоне от 2 до 8';
-  sInvalidStringCh = 'Недопустимый символ в строке (0x%.2x)';
-  sInvalidTextChar = 'Недопустимый символ в текстовом блоке (0x%.2x)';
-  sInvalidWrapChar = 'Недопустимый символ в свёрнутой строке (0x%.2x)';
-  sUnknownStrType  = 'Неизвестный тип строки ''%s'' (%d)';
+  s2SmallWrapValue = 'РЎР»РёС€РєРѕРј РјР°Р»РµРЅСЊРєРѕРµ Р·РЅР°С‡РµРЅРёРµ С€РёСЂРёРЅС‹ СЃРІС‘СЂРЅСѓС‚РѕР№ СЃС‚СЂРѕРєРё (%d)';
+  sFileWriteError  = 'РћС€РёР±РєР° Р·Р°РїРёСЃРё "%s". %s';
+  sInvalidIndntStp = 'РћС‚СЃС‚СѓРї СѓСЂРѕРІРЅСЏ РІР»РѕР¶РµРЅРЅРѕСЃС‚Рё РґРѕР»Р¶РµРЅ РЅР°С…РѕРґРёС‚СЊСЃСЏ РІ РґРёР°РїР°Р·РѕРЅРµ РѕС‚ 2 РґРѕ 8';
+  sInvalidStringCh = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР» РІ СЃС‚СЂРѕРєРµ (0x%.2x)';
+  sInvalidTextChar = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР» РІ С‚РµРєСЃС‚РѕРІРѕРј Р±Р»РѕРєРµ (0x%.2x)';
+  sInvalidWrapChar = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР» РІ СЃРІС‘СЂРЅСѓС‚РѕР№ СЃС‚СЂРѕРєРµ (0x%.2x)';
+  sUnknownStrType  = 'РќРµРёР·РІРµСЃС‚РЅС‹Р№ С‚РёРї СЃС‚СЂРѕРєРё ''%s'' (%d)';
 
 type
   HSCLNode = record helper for TSCLNode
@@ -170,11 +170,11 @@ end;
 procedure TSCLWriter.WriteDocument(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding);
 begin
   var Buffer := Encoding.GetBytes(WriteDocument(Document));
-  { Открываем файл для записи }
+  { РћС‚РєСЂС‹РІР°РµРј С„Р°Р№Р» РґР»СЏ Р·Р°РїРёСЃРё }
   var hSource := FileCreate(AFileName, fmOpenWrite or fmShareExclusive);
   if hSource = INVALID_HANDLE_VALUE then
     raise ESCLWritingException.CreateResFmt(@sFileWriteError, [AFileName, SysErrorMessage(GetLastError)]);
-  { Сохраняем данные документа в файл }
+  { РЎРѕС…СЂР°РЅСЏРµРј РґР°РЅРЅС‹Рµ РґРѕРєСѓРјРµРЅС‚Р° РІ С„Р°Р№Р» }
   try
     var Preamble := Encoding.GetPreamble;
     if ((Preamble <> nil) and (FileWrite(hSource, PByte(Preamble)^, Length(Preamble)) < Length(Preamble))) or
@@ -198,7 +198,7 @@ begin
     var Ch := Cursor^;
     if Word(Ch) and $FF80 = 0 then
     begin
-      { Допускаются любые символы }
+      { Р”РѕРїСѓСЃРєР°СЋС‚СЃСЏ Р»СЋР±С‹Рµ СЃРёРјРІРѕР»С‹ }
       case StringMap[Ch] and $F0 of
         ESCAPE_NOT: Continue;
         ESCAPE_CHR: FTextBuffer.Append(Source, Cursor - Source).Append('\').Append(EscapeChars[Ch]);
@@ -213,22 +213,22 @@ end;
 
 procedure TSCLWriter.WriteLiteralString(const Value, Suffix: string);
 begin
-  { Инициализация переменных }
+  { РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїРµСЂРµРјРµРЅРЅС‹С… }
   FTextBuffer.Append(#39);
   var Source := PPChar(@Value)^;
   var Cursor := Source;
-  { Проверяем строку на наличие недопустимых символов }
+  { РџСЂРѕРІРµСЂСЏРµРј СЃС‚СЂРѕРєСѓ РЅР° РЅР°Р»РёС‡РёРµ РЅРµРґРѕРїСѓСЃС‚РёРјС‹С… СЃРёРјРІРѕР»РѕРІ }
   for var Index := 1 to Value.Length do
   begin
     var Ch := Cursor^;
     if Word(Ch) and $FF80 = 0 then
-      { Допускаются любые символы, кроме непечатных и переносов строки }
+      { Р”РѕРїСѓСЃРєР°СЋС‚СЃСЏ Р»СЋР±С‹Рµ СЃРёРјРІРѕР»С‹, РєСЂРѕРјРµ РЅРµРїРµС‡Р°С‚РЅС‹С… Рё РїРµСЂРµРЅРѕСЃРѕРІ СЃС‚СЂРѕРєРё }
       case StringMap[Ch] and $0F of
         STR_VALID, STR_ESCAPE: ;
         STR_QUOTE:
           if Ch = #39 then         
           begin
-            { Кавычки - допускаются, но удваиваются в строке }
+            { РљР°РІС‹С‡РєРё - РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ, РЅРѕ СѓРґРІР°РёРІР°СЋС‚СЃСЏ РІ СЃС‚СЂРѕРєРµ }
             FTextBuffer.Append(Source, Cursor - Source).Append(#39#39);
             Source := Cursor + 1;
           end;
@@ -236,7 +236,7 @@ begin
       end;
     Inc(Cursor);
   end;
-  { Завершаем строку }
+  { Р—Р°РІРµСЂС€Р°РµРј СЃС‚СЂРѕРєСѓ }
   FTextBuffer.Append(Source, Cursor - Source).Append(#39).Append(Suffix);
 end;
 
@@ -305,18 +305,18 @@ begin
   end;
   if Node.IsArrayItem and not FLeadArray then
   begin
-    { Пишем элементы с текущей строки }
+    { РџРёС€РµРј СЌР»РµРјРµРЅС‚С‹ СЃ С‚РµРєСѓС‰РµР№ СЃС‚СЂРѕРєРё }
     FIndent.Increment(2);
     WriteNode(Item, FTextBuffer.LineBreak);
   end else
   begin
-    { Пишем элементы с новой строки }
+    { РџРёС€РµРј СЌР»РµРјРµРЅС‚С‹ СЃ РЅРѕРІРѕР№ СЃС‚СЂРѕРєРё }
     FIndent.Increment(FIndentStep);
     if FIndent.Value > 0 then
       FTextBuffer.AppendLineBreak.Indent(FIndent.Value);
     WriteNode(Item, FTextBuffer.LineBreak);
   end;
-  { Дальше обычный цикл по элементам }
+  { Р”Р°Р»СЊС€Рµ РѕР±С‹С‡РЅС‹Р№ С†РёРєР» РїРѕ СЌР»РµРјРµРЅС‚Р°Рј }
   for var Index := 1 to Node.Count - 1 do
   begin
     Item := Item.NextSibling;
@@ -330,23 +330,23 @@ procedure TSCLWriter.WriteTextString(const Value: string);
 const
   LW_CRLF = $000A000D;
 begin
-  { Сохраняем ссылку на начало исходного текста }
+  { РЎРѕС…СЂР°РЅСЏРµРј СЃСЃС‹Р»РєСѓ РЅР° РЅР°С‡Р°Р»Рѕ РёСЃС…РѕРґРЅРѕРіРѕ С‚РµРєСЃС‚Р° }
   var Source := PPChar(@Value)^;
-  { Записываем идентификатор текстового блока и отступ при необходимости }
+  { Р—Р°РїРёСЃС‹РІР°РµРј РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ С‚РµРєСЃС‚РѕРІРѕРіРѕ Р±Р»РѕРєР° Рё РѕС‚СЃС‚СѓРї РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё }
   FTextBuffer.Append('|');
   if (Source <> nil) and (Source^ = #32) then
     FTextBuffer.Append(IntToStr(FIndentStep));
   FTextBuffer.AppendLineBreak;
-  { Увеличиваем значение отступа }
+  { РЈРІРµР»РёС‡РёРІР°РµРј Р·РЅР°С‡РµРЅРёРµ РѕС‚СЃС‚СѓРїР° }
   FIndent.Increment(FIndentStep);
-  { Пишем текст построчно с переносами строки }
+  { РџРёС€РµРј С‚РµРєСЃС‚ РїРѕСЃС‚СЂРѕС‡РЅРѕ СЃ РїРµСЂРµРЅРѕСЃР°РјРё СЃС‚СЂРѕРєРё }
   var Cursor := Source;
   var Last := Source + Value.Length;
   while Cursor < Last do
   begin
     var Ch := Cursor^;
     if Word(Ch) and $FF80 = 0 then
-      { Допускаются любые символы, кроме непечатных }
+      { Р”РѕРїСѓСЃРєР°СЋС‚СЃСЏ Р»СЋР±С‹Рµ СЃРёРјРІРѕР»С‹, РєСЂРѕРјРµ РЅРµРїРµС‡Р°С‚РЅС‹С… }
       case StringMap[Ch] and $0F of
         STR_VALID, STR_ESCAPE, STR_QUOTE: ;
         STR_BREAK:
@@ -362,7 +362,7 @@ begin
   end;
   if Cursor > Source then
     FTextBuffer.Indent(FIndent.Value).Append(Source, Cursor - Source).AppendLineBreak;;
-  { Уменьшаем значение отступа }
+  { РЈРјРµРЅСЊС€Р°РµРј Р·РЅР°С‡РµРЅРёРµ РѕС‚СЃС‚СѓРїР° }
   FIndent.Decrement;
 end;
 
@@ -380,16 +380,16 @@ procedure TSCLWriter.WriteWrappedString(const Value: string);
   end;
 
 begin
-  { Сохраняем длину текста и ссылку на него }
+  { РЎРѕС…СЂР°РЅСЏРµРј РґР»РёРЅСѓ С‚РµРєСЃС‚Р° Рё СЃСЃС‹Р»РєСѓ РЅР° РЅРµРіРѕ }
   var Source := PPChar(@Value)^;
-  { Увеличиваем значение отступа }
+  { РЈРІРµР»РёС‡РёРІР°РµРј Р·РЅР°С‡РµРЅРёРµ РѕС‚СЃС‚СѓРїР° }
   FIndent.Increment(FIndentStep);
-  { Записываем идентификатор свёрнутого текста и отступ при необходимости }
+  { Р—Р°РїРёСЃС‹РІР°РµРј РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЃРІС‘СЂРЅСѓС‚РѕРіРѕ С‚РµРєСЃС‚Р° Рё РѕС‚СЃС‚СѓРї РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё }
   FTextBuffer.Append('>');
   if (Source <> nil) and (Source^ = #32) then
     FTextBuffer.Append(IntToStr(FIndentStep));
   FTextBuffer.AppendLineBreak;
-  { Ширина текста не может быть меньше чем MIN_WRAPPED_WIDTH }
+  { РЁРёСЂРёРЅР° С‚РµРєСЃС‚Р° РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РјРµРЅСЊС€Рµ С‡РµРј MIN_WRAPPED_WIDTH }
   var WrapLength := Max(FWrapWidth - FIndent.Value, MIN_WRAPPED_WIDTH);
   var Checkpoint := Source + Value.Length - WrapLength;
   var Margin := WrapLength shr 2;
@@ -408,9 +408,9 @@ begin
     end;
     FTextBuffer.AppendLineBreak;
   end;
-  { Записываем остаток текста при его наличии }
+  { Р—Р°РїРёСЃС‹РІР°РµРј РѕСЃС‚Р°С‚РѕРє С‚РµРєСЃС‚Р° РїСЂРё РµРіРѕ РЅР°Р»РёС‡РёРё }
   FTextBuffer.Indent(FIndent.Value).Append(Source, Checkpoint + WrapLength - Source).AppendLineBreak;
-  { Уменьшаем значение отступа }
+  { РЈРјРµРЅСЊС€Р°РµРј Р·РЅР°С‡РµРЅРёРµ РѕС‚СЃС‚СѓРїР° }
   FIndent.Decrement;
 end;
 

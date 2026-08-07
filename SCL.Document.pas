@@ -1,4 +1,4 @@
-unit SCL.Document;
+п»їunit SCL.Document;
 
 {******************************************************************************}
 {  Delphi-SCL - Simple Config Language Library                                 }
@@ -14,7 +14,7 @@ unit SCL.Document;
 
 interface
 
-{$Q-} // переполнение не баг, а полезная фича
+{$Q-} // РїРµСЂРµРїРѕР»РЅРµРЅРёРµ РЅРµ Р±Р°Рі, Р° РїРѕР»РµР·РЅР°СЏ С„РёС‡Р°
 
 uses
   System.SysUtils, SCL.Common;
@@ -36,7 +36,7 @@ type
 
   TSCLDocument = class;
 
-  { Не объявляйте данный тип локально, используйте только по ссылке! }
+  { РќРµ РѕР±СЉСЏРІР»СЏР№С‚Рµ РґР°РЅРЅС‹Р№ С‚РёРї Р»РѕРєР°Р»СЊРЅРѕ, РёСЃРїРѕР»СЊР·СѓР№С‚Рµ С‚РѕР»СЊРєРѕ РїРѕ СЃСЃС‹Р»РєРµ! }
   PSCLNode = ^TSCLNode;
   TSCLNode = record
   public type
@@ -63,10 +63,10 @@ type
       FLast: PSCLNode;
     end;
   private
-    FName: string;     // имя узла или комментарий
+    FName: string;     // РёРјСЏ СѓР·Р»Р° РёР»Рё РєРѕРјРјРµРЅС‚Р°СЂРёР№
     FType: TSCLNodeType;
-    FSubType: Byte;    // расширенный тип для строк и чисел
-    FInfo: SmallInt;   // смещение времени для дат или количество элементов для таблиц и массивов
+    FSubType: Byte;    // СЂР°СЃС€РёСЂРµРЅРЅС‹Р№ С‚РёРї РґР»СЏ СЃС‚СЂРѕРє Рё С‡РёСЃРµР»
+    FInfo: SmallInt;   // СЃРјРµС‰РµРЅРёРµ РІСЂРµРјРµРЅРё РґР»СЏ РґР°С‚ РёР»Рё РєРѕР»РёС‡РµСЃС‚РІРѕ СЌР»РµРјРµРЅС‚РѕРІ РґР»СЏ С‚Р°Р±Р»РёС† Рё РјР°СЃСЃРёРІРѕРІ
     FParent: PSCLNode; // TSCLArray.FDocument
     FNext: PSCLNode;   // TSCLArray.FFirst
     FValue: Int64;     // TSCLArray.FLast
@@ -104,79 +104,79 @@ type
     procedure TypeCheckParent;
   public
     class operator Finalize(var Instance: TSCLNode);
-    { Используется для блокирования прямого копирования значений }
+    { РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РґР»СЏ Р±Р»РѕРєРёСЂРѕРІР°РЅРёСЏ РїСЂСЏРјРѕРіРѕ РєРѕРїРёСЂРѕРІР°РЅРёСЏ Р·РЅР°С‡РµРЅРёР№ }
     class operator Assign(var Dest: TSCLNode; const [ref] Src: TSCLNode);
-     { Добавляет комментарий к узлу Node (по факту перед ним) }
+     { Р”РѕР±Р°РІР»СЏРµС‚ РєРѕРјРјРµРЅС‚Р°СЂРёР№ Рє СѓР·Р»Сѓ Node (РїРѕ С„Р°РєС‚Сѓ РїРµСЂРµРґ РЅРёРј) }
      class function AddComment(Node: PSCLNode; const Comment: string): PSCLNode; overload; static;
      function AddComment(const Comment: string): PSCLNode; overload;
-     { Добавляет дочерний узел заданного типа }
+     { Р”РѕР±Р°РІР»СЏРµС‚ РґРѕС‡РµСЂРЅРёР№ СѓР·РµР» Р·Р°РґР°РЅРЅРѕРіРѕ С‚РёРїР° }
      function AddNode(const AName: string; AType: TSCLNodeType): PSCLNode; overload; inline;
-     { Добавляет дочернюю таблицу или массив. Пустой массив может быть преобразован в таблицу. }
+     { Р”РѕР±Р°РІР»СЏРµС‚ РґРѕС‡РµСЂРЅСЋСЋ С‚Р°Р±Р»РёС†Сѓ РёР»Рё РјР°СЃСЃРёРІ. РџСѓСЃС‚РѕР№ РјР°СЃСЃРёРІ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅ РІ С‚Р°Р±Р»РёС†Сѓ. }
      function AddArray(const AName: string; IsInline: Boolean = False): PSCLNode;
      function AddTable(const AName: string; IsInline: Boolean = False): PSCLNode;
-     { Добавляют узлы разных типов и присваивают им значения }
+     { Р”РѕР±Р°РІР»СЏСЋС‚ СѓР·Р»С‹ СЂР°Р·РЅС‹С… С‚РёРїРѕРІ Рё РїСЂРёСЃРІР°РёРІР°СЋС‚ РёРј Р·РЅР°С‡РµРЅРёСЏ }
      function AddValue(const AName: string; const Value: Boolean): PSCLNode; overload;
      function AddValue(const AName: string; const Value: string; &Type: TStringType = stDefault): PSCLNode; overload;
      function AddValue(const AName: string; const Value: Int64; Base: TNumberBase = nbDefault): PSCLNode; overload;
      function AddValue(const AName: string; const Value: Double; APrecision: TPrecision = 16): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TBytes): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TDateTime; AOffset: SmallInt = 0): PSCLNode; overload;
-    { Присваивает узлу значение и дополнительную информацию в один шаг. Устанавливает тип пустых узлов. }
+    { РџСЂРёСЃРІР°РёРІР°РµС‚ СѓР·Р»Сѓ Р·РЅР°С‡РµРЅРёРµ Рё РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ РІ РѕРґРёРЅ С€Р°Рі. РЈСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ С‚РёРї РїСѓСЃС‚С‹С… СѓР·Р»РѕРІ. }
     procedure SetValue(const Value: Boolean); overload;
     procedure SetValue(const Value: Double; APrecision: TPrecision = 16); overload;
     procedure SetValue(const Value: Int64; Base: TNumberBase = nbDefault); overload;
     procedure SetValue(const Value: TBytes); overload;
     procedure SetValue(const Value: TDateTime; AOffset: SmallInt = 0); overload;
     procedure SetValue(const Value: string; &Type: TStringType = stDefault); overload;
-    { Присваивает пустому узлу значение Null }
+    { РџСЂРёСЃРІР°РёРІР°РµС‚ РїСѓСЃС‚РѕРјСѓ СѓР·Р»Сѓ Р·РЅР°С‡РµРЅРёРµ Null }
     procedure SetNullValue; inline;
      function GetEnumerator: TArrayEnumerator; inline;
-     { Признак того, что это первый или последний узел у родителя }
+     { РџСЂРёР·РЅР°Рє С‚РѕРіРѕ, С‡С‚Рѕ СЌС‚Рѕ РїРµСЂРІС‹Р№ РёР»Рё РїРѕСЃР»РµРґРЅРёР№ СѓР·РµР» Сѓ СЂРѕРґРёС‚РµР»СЏ }
      function IsFirst: Boolean; inline;
      function IsLast: Boolean; inline;
-     { Возвращает True для строчных массивов и таблиц }
+     { Р’РѕР·РІСЂР°С‰Р°РµС‚ True РґР»СЏ СЃС‚СЂРѕС‡РЅС‹С… РјР°СЃСЃРёРІРѕРІ Рё С‚Р°Р±Р»РёС† }
      function IsInline: Boolean; inline;
-     { Признак корневого узла документа }
+     { РџСЂРёР·РЅР°Рє РєРѕСЂРЅРµРІРѕРіРѕ СѓР·Р»Р° РґРѕРєСѓРјРµРЅС‚Р° }
      function IsRoot: Boolean; inline;
-     { Возвращает дочерний узел по его пути ('table/array/@<index>') }
+     { Р’РѕР·РІСЂР°С‰Р°РµС‚ РґРѕС‡РµСЂРЅРёР№ СѓР·РµР» РїРѕ РµРіРѕ РїСѓС‚Рё ('table/array/@<index>') }
      function ItemByPath(const NodePath: string): PSCLNode;
-     { Возвращают дочерние узлы в виде массива }
+     { Р’РѕР·РІСЂР°С‰Р°СЋС‚ РґРѕС‡РµСЂРЅРёРµ СѓР·Р»С‹ РІ РІРёРґРµ РјР°СЃСЃРёРІР° }
      function ToArray: TArray<PSCLNode>;
-     { Преобразует значение узла в вещественное чисто, работает с Integer, Float и String }
+     { РџСЂРµРѕР±СЂР°Р·СѓРµС‚ Р·РЅР°С‡РµРЅРёРµ СѓР·Р»Р° РІ РІРµС‰РµСЃС‚РІРµРЅРЅРѕРµ С‡РёСЃС‚Рѕ, СЂР°Р±РѕС‚Р°РµС‚ СЃ Integer, Float Рё String }
      function ToFloat: Double;
-     { Преобразует значение узла в целое число, работает с Integer, Float и String }
+     { РџСЂРµРѕР±СЂР°Р·СѓРµС‚ Р·РЅР°С‡РµРЅРёРµ СѓР·Р»Р° РІ С†РµР»РѕРµ С‡РёСЃР»Рѕ, СЂР°Р±РѕС‚Р°РµС‚ СЃ Integer, Float Рё String }
      function ToInteger: Int64;
-     { Преобразует значение узла в строку, не работает с массивами и таблицами }
+     { РџСЂРµРѕР±СЂР°Р·СѓРµС‚ Р·РЅР°С‡РµРЅРёРµ СѓР·Р»Р° РІ СЃС‚СЂРѕРєСѓ, РЅРµ СЂР°Р±РѕС‚Р°РµС‚ СЃ РјР°СЃСЃРёРІР°РјРё Рё С‚Р°Р±Р»РёС†Р°РјРё }
      function ToString: string; reintroduce;
-     { Количество дочерних узлов в контейнере }
+     { РљРѕР»РёС‡РµСЃС‚РІРѕ РґРѕС‡РµСЂРЅРёС… СѓР·Р»РѕРІ РІ РєРѕРЅС‚РµР№РЅРµСЂРµ }
      property Count: Integer read GetCount;
-     { Возвращает порядковый номер текущего элемента }
+     { Р’РѕР·РІСЂР°С‰Р°РµС‚ РїРѕСЂСЏРґРєРѕРІС‹Р№ РЅРѕРјРµСЂ С‚РµРєСѓС‰РµРіРѕ СЌР»РµРјРµРЅС‚Р° }
      property ItemIndex: Integer read GetItemIndex;
-     { Имя узла или текст комментария }
+     { РРјСЏ СѓР·Р»Р° РёР»Рё С‚РµРєСЃС‚ РєРѕРјРјРµРЅС‚Р°СЂРёСЏ }
      property Name: string read FName;
-     { Путь к узлу от корневого узла }
+     { РџСѓС‚СЊ Рє СѓР·Р»Сѓ РѕС‚ РєРѕСЂРЅРµРІРѕРіРѕ СѓР·Р»Р° }
      property Path: string read GetPath;
-     { Точность числа с плавающей точкой }
+     { РўРѕС‡РЅРѕСЃС‚СЊ С‡РёСЃР»Р° СЃ РїР»Р°РІР°СЋС‰РµР№ С‚РѕС‡РєРѕР№ }
      property Precision: TPrecision read GetPrecision write SetPrecision;
-     { Предыдущий и следующий узлы в текущем контейнере }
+     { РџСЂРµРґС‹РґСѓС‰РёР№ Рё СЃР»РµРґСѓСЋС‰РёР№ СѓР·Р»С‹ РІ С‚РµРєСѓС‰РµРј РєРѕРЅС‚РµР№РЅРµСЂРµ }
      property PrevSibling: PSCLNode read GetPrev;
      property NextSibling: PSCLNode read FNext;
-     { Возвращают первый и последний дочерний узел }
+     { Р’РѕР·РІСЂР°С‰Р°СЋС‚ РїРµСЂРІС‹Р№ Рё РїРѕСЃР»РµРґРЅРёР№ РґРѕС‡РµСЂРЅРёР№ СѓР·РµР» }
      property FirstChild: PSCLNode read GetFirstChild;
      property LastChild: PSCLNode read GetLastChild;
-     { Возвращает дочерний узел по его имени, если такого нет вернёт nil }
+     { Р’РѕР·РІСЂР°С‰Р°РµС‚ РґРѕС‡РµСЂРЅРёР№ СѓР·РµР» РїРѕ РµРіРѕ РёРјРµРЅРё, РµСЃР»Рё С‚Р°РєРѕРіРѕ РЅРµС‚ РІРµСЂРЅС‘С‚ nil }
      property Items[const AName: string]: PSCLNode read GetItemByName; default;
-     { Тип узла }
+     { РўРёРї СѓР·Р»Р° }
      property NodeType: TSCLNodeType read FType;
-     { Система счисления для записи числа }
+     { РЎРёСЃС‚РµРјР° СЃС‡РёСЃР»РµРЅРёСЏ РґР»СЏ Р·Р°РїРёСЃРё С‡РёСЃР»Р° }
      property NumberBase: TNumberBase read GetNumberBase write SetNumberBase;
-     { Родительский узел, nil для RootNode и NullNode }
+     { Р РѕРґРёС‚РµР»СЊСЃРєРёР№ СѓР·РµР», nil РґР»СЏ RootNode Рё NullNode }
      property Parent: PSCLNode read FParent;
-     { Смещение времени для ntDateTime, равно -1 для локального времени }
+     { РЎРјРµС‰РµРЅРёРµ РІСЂРµРјРµРЅРё РґР»СЏ ntDateTime, СЂР°РІРЅРѕ -1 РґР»СЏ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РІСЂРµРјРµРЅРё }
      property TimeOffset: SmallInt read GetTimeOffset write SetTimeOffset;
-     { Тип строки }
+     { РўРёРї СЃС‚СЂРѕРєРё }
      property StringType: TStringType read GetStringType write SetStringType;
-     { Возвращает дочерний узел соответствующего типа по его имени, при отсутствии создаёт новый }
+     { Р’РѕР·РІСЂР°С‰Р°РµС‚ РґРѕС‡РµСЂРЅРёР№ СѓР·РµР» СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РµРіРѕ С‚РёРїР° РїРѕ РµРіРѕ РёРјРµРЅРё, РїСЂРё РѕС‚СЃСѓС‚СЃС‚РІРёРё СЃРѕР·РґР°С‘С‚ РЅРѕРІС‹Р№ }
      property A[const AName: string]: PSCLNode index ntArray    read GetOrAddNode;
      property B[const AName: string]: PSCLNode index ntBoolean  read GetOrAddNode;
      property D[const AName: string]: PSCLNode index ntDateTime read GetOrAddNode;
@@ -185,7 +185,7 @@ type
      property O[const AName: string]: PSCLNode index ntBinary   read GetOrAddNode; // Octet string - Binary
      property S[const AName: string]: PSCLNode index ntString   read GetOrAddNode;
      property T[const AName: string]: PSCLNode index ntTable    read GetOrAddNode;
-     { Значения узлов соответствующего типа }
+     { Р—РЅР°С‡РµРЅРёСЏ СѓР·Р»РѕРІ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РµРіРѕ С‚РёРїР° }
      property AsBytes: TBytes read GetBinary write SetValue;
      property AsBoolean: Boolean read GetBoolean write SetValue;
      property AsDateTime: TDateTime read GetDateTime write SetDateTime;
@@ -198,7 +198,7 @@ type
   private const
     MINIMUM_STORE_ITEMS = 1024;
   private type
-    { Используется для снижения фрагментации памяти и исключения копирования массивов данных }
+    { РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РґР»СЏ СЃРЅРёР¶РµРЅРёСЏ С„СЂР°РіРјРµРЅС‚Р°С†РёРё РїР°РјСЏС‚Рё Рё РёСЃРєР»СЋС‡РµРЅРёСЏ РєРѕРїРёСЂРѕРІР°РЅРёСЏ РјР°СЃСЃРёРІРѕРІ РґР°РЅРЅС‹С… }
     PNodeArray = ^TNodeArray;
     TNodeArray = record
     private
@@ -225,19 +225,19 @@ type
   end;
 
 resourcestring
-  sTypeName_Array    = 'массив';
-  sTypeName_Binary   = 'двоичный';
-  sTypeName_Boolean  = 'логический';
-  sTypeName_DateTime = 'дата/время';
-  sTypeName_Empty    = 'пустой';
-  sTypeName_Float    = 'число';
-  sTypeName_Integer  = 'целое';
+  sTypeName_Array    = 'РјР°СЃСЃРёРІ';
+  sTypeName_Binary   = 'РґРІРѕРёС‡РЅС‹Р№';
+  sTypeName_Boolean  = 'Р»РѕРіРёС‡РµСЃРєРёР№';
+  sTypeName_DateTime = 'РґР°С‚Р°/РІСЂРµРјСЏ';
+  sTypeName_Empty    = 'РїСѓСЃС‚РѕР№';
+  sTypeName_Float    = 'С‡РёСЃР»Рѕ';
+  sTypeName_Integer  = 'С†РµР»РѕРµ';
   sTypeName_Null     = 'null';
-  sTypeName_String   = 'строка';
-  sTypeName_Table    = 'таблица';
+  sTypeName_String   = 'СЃС‚СЂРѕРєР°';
+  sTypeName_Table    = 'С‚Р°Р±Р»РёС†Р°';
 
 const
-  TIME_OFFSET_LOCAL = -1; // зарезервированное смещение времени для локальных дат
+  TIME_OFFSET_LOCAL = -1; // Р·Р°СЂРµР·РµСЂРІРёСЂРѕРІР°РЅРЅРѕРµ СЃРјРµС‰РµРЅРёРµ РІСЂРµРјРµРЅРё РґР»СЏ Р»РѕРєР°Р»СЊРЅС‹С… РґР°С‚
 
   SCLTypeNames: array [TSCLNodeType] of string = (
     sTypeName_Empty,
@@ -258,30 +258,30 @@ implementation
 uses
   System.DateUtils;
 
-{$IF SizeOf(TSCLNode) > 24}{$Message Warn 'Превышен запланированный размер узла SCL в 24 байта!'}{$IFEND}
+{$IF SizeOf(TSCLNode) > 24}{$Message Warn 'РџСЂРµРІС‹С€РµРЅ Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅРЅС‹Р№ СЂР°Р·РјРµСЂ СѓР·Р»Р° SCL РІ 24 Р±Р°Р№С‚Р°!'}{$IFEND}
 
 resourcestring
-  sAssignNotAllowed  = 'Не допускается прямое копирование элементов TSCLNode';
-  sConversionFailed  = 'Невозможно преобразовать элемент ''%s'' [%s] к типу ''%s''';
-  sDuplicateItemName = 'Элемент ''%s'' уже существует в таблице %s';
-  sIllegalNameChars  = 'Недопустимый символ в имени узла: ''%s''';
-  sInvalidNodePath   = 'Некорректный путь к узлу: ''%s''';
-  sInvalidValueType  = 'Элемент ''%s'' [%s] должен иметь тип ''%s''';
-  sLookupTableIsFull = 'В массиве хэшей нет свободных мест';
-  sNestedInlineError = 'Вложенные строчные массивы и таблицы не допускаются';
-  sNoArrayNameAllowd = 'Элементы массива не могут иметь ключей';
-  sNoCommentInInline = 'Комментарии в строчных массивах и таблицах не допускаются';
-  sNodeIsNotAParent  = 'Элемент ''%s'' [%s] не является массивом или таблицей';
-  sNoParentNodeFound = 'У элемента ''%s'' отсутствует родительский узел';
-  sNoRootNodeComment = 'Нельзя добавить комментарий к корневому узлу документа';
-  sNoTextBlckAllowed = 'Текстовые блоки не допускаются внутри строчных массивов и таблиц';
-  sTableItemNameRqrd = 'Для элементов таблиц необходимо указать не пустые имена';
-  sTooManyChildItems = 'Достигнут предел дочерних элементов в ''%s''';
-  sUnacceptableType  = 'Недопустимый тип элемента ''%s''';
+  sAssignNotAllowed  = 'РќРµ РґРѕРїСѓСЃРєР°РµС‚СЃСЏ РїСЂСЏРјРѕРµ РєРѕРїРёСЂРѕРІР°РЅРёРµ СЌР»РµРјРµРЅС‚РѕРІ TSCLNode';
+  sConversionFailed  = 'РќРµРІРѕР·РјРѕР¶РЅРѕ РїСЂРµРѕР±СЂР°Р·РѕРІР°С‚СЊ СЌР»РµРјРµРЅС‚ ''%s'' [%s] Рє С‚РёРїСѓ ''%s''';
+  sDuplicateItemName = 'Р­Р»РµРјРµРЅС‚ ''%s'' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ С‚Р°Р±Р»РёС†Рµ %s';
+  sIllegalNameChars  = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР» РІ РёРјРµРЅРё СѓР·Р»Р°: ''%s''';
+  sInvalidNodePath   = 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїСѓС‚СЊ Рє СѓР·Р»Сѓ: ''%s''';
+  sInvalidValueType  = 'Р­Р»РµРјРµРЅС‚ ''%s'' [%s] РґРѕР»Р¶РµРЅ РёРјРµС‚СЊ С‚РёРї ''%s''';
+  sLookupTableIsFull = 'Р’ РјР°СЃСЃРёРІРµ С…СЌС€РµР№ РЅРµС‚ СЃРІРѕР±РѕРґРЅС‹С… РјРµСЃС‚';
+  sNestedInlineError = 'Р’Р»РѕР¶РµРЅРЅС‹Рµ СЃС‚СЂРѕС‡РЅС‹Рµ РјР°СЃСЃРёРІС‹ Рё С‚Р°Р±Р»РёС†С‹ РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sNoArrayNameAllowd = 'Р­Р»РµРјРµРЅС‚С‹ РјР°СЃСЃРёРІР° РЅРµ РјРѕРіСѓС‚ РёРјРµС‚СЊ РєР»СЋС‡РµР№';
+  sNoCommentInInline = 'РљРѕРјРјРµРЅС‚Р°СЂРёРё РІ СЃС‚СЂРѕС‡РЅС‹С… РјР°СЃСЃРёРІР°С… Рё С‚Р°Р±Р»РёС†Р°С… РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sNodeIsNotAParent  = 'Р­Р»РµРјРµРЅС‚ ''%s'' [%s] РЅРµ СЏРІР»СЏРµС‚СЃСЏ РјР°СЃСЃРёРІРѕРј РёР»Рё С‚Р°Р±Р»РёС†РµР№';
+  sNoParentNodeFound = 'РЈ СЌР»РµРјРµРЅС‚Р° ''%s'' РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ СЂРѕРґРёС‚РµР»СЊСЃРєРёР№ СѓР·РµР»';
+  sNoRootNodeComment = 'РќРµР»СЊР·СЏ РґРѕР±Р°РІРёС‚СЊ РєРѕРјРјРµРЅС‚Р°СЂРёР№ Рє РєРѕСЂРЅРµРІРѕРјСѓ СѓР·Р»Сѓ РґРѕРєСѓРјРµРЅС‚Р°';
+  sNoTextBlckAllowed = 'РўРµРєСЃС‚РѕРІС‹Рµ Р±Р»РѕРєРё РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ РІРЅСѓС‚СЂРё СЃС‚СЂРѕС‡РЅС‹С… РјР°СЃСЃРёРІРѕРІ Рё С‚Р°Р±Р»РёС†';
+  sTableItemNameRqrd = 'Р”Р»СЏ СЌР»РµРјРµРЅС‚РѕРІ С‚Р°Р±Р»РёС† РЅРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ РЅРµ РїСѓСЃС‚С‹Рµ РёРјРµРЅР°';
+  sTooManyChildItems = 'Р”РѕСЃС‚РёРіРЅСѓС‚ РїСЂРµРґРµР» РґРѕС‡РµСЂРЅРёС… СЌР»РµРјРµРЅС‚РѕРІ РІ ''%s''';
+  sUnacceptableType  = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ С‚РёРї СЌР»РµРјРµРЅС‚Р° ''%s''';
 
   {$IFDEF CPU64BITS}
-  sMaxDocSizeExceed  = 'Превышен максимальный размер SCL-документа';
-  sMaxHashSizeExceed = 'Превышен максимально допустимый размер хэш-таблицы';
+  sMaxDocSizeExceed  = 'РџСЂРµРІС‹С€РµРЅ РјР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СЂР°Р·РјРµСЂ SCL-РґРѕРєСѓРјРµРЅС‚Р°';
+  sMaxHashSizeExceed = 'РџСЂРµРІС‹С€РµРЅ РјР°РєСЃРёРјР°Р»СЊРЅРѕ РґРѕРїСѓСЃС‚РёРјС‹Р№ СЂР°Р·РјРµСЂ С…СЌС€-С‚Р°Р±Р»РёС†С‹';
   {$ENDIF}
 
 var
@@ -331,16 +331,16 @@ function HashFNV1a16(Parent: PSCLNode; const Key: string): Cardinal;
 begin
   Result := ($811C9DC5 xor LongWord(Parent)) * $01000193;
   for var Index := 1 to Key.Length do
-    { Хеш считается от нижнего регистра (or $20) символов,
-      при этом символ '_' ($5F) получает код $7F, который
-      сам по себе не допукается в именах ключей. }
+    { РҐРµС€ СЃС‡РёС‚Р°РµС‚СЃСЏ РѕС‚ РЅРёР¶РЅРµРіРѕ СЂРµРіРёСЃС‚СЂР° (or $20) СЃРёРјРІРѕР»РѕРІ,
+      РїСЂРё СЌС‚РѕРј СЃРёРјРІРѕР» '_' ($5F) РїРѕР»СѓС‡Р°РµС‚ РєРѕРґ $7F, РєРѕС‚РѕСЂС‹Р№
+      СЃР°Рј РїРѕ СЃРµР±Рµ РЅРµ РґРѕРїСѓРєР°РµС‚СЃСЏ РІ РёРјРµРЅР°С… РєР»СЋС‡РµР№. }
     Result := (LongWord(Key[Index]) or $20 xor Result) * $01000193;
 end;
 
 function IntToBaseTwo(Value: Int64; Shift: Byte): string;
 const
   Bases: array [0..4] of LongWord = (0, $00620030, 0, $006F0030, $00780030);
-  MAX_STRING_LENGTH = 66; // 64 бита + '0b'
+  MAX_STRING_LENGTH = 66; // 64 Р±РёС‚Р° + '0b'
 var
   Buffer: array [0..MAX_STRING_LENGTH - 1] of Char;
 begin
@@ -395,18 +395,18 @@ function TSCLNode.AddChild(const AName: string; AType: TSCLNodeType; LookupIndex
 const
   ParentTypes: array [Boolean] of TSCLNodeType = (ntArray, ntTable);
 begin
-  { Нельзя создать узлы следующих типов стандартным способом }
+  { РќРµР»СЊР·СЏ СЃРѕР·РґР°С‚СЊ СѓР·Р»С‹ СЃР»РµРґСѓСЋС‰РёС… С‚РёРїРѕРІ СЃС‚Р°РЅРґР°СЂС‚РЅС‹Рј СЃРїРѕСЃРѕР±РѕРј }
   if AType in [ntReserved, ntComment] then
     raise ESCLError.CreateResFmt(@sUnacceptableType, [SCLTypeNames[AType]]);
   var PNodeName := PPChar(@AName)^;
   case FType of
     ntArray:
       if PNodeName <> nil then
-        { При попытке добавить в пустой массив узел с именем - массив становится таблицей }
+        { РџСЂРё РїРѕРїС‹С‚РєРµ РґРѕР±Р°РІРёС‚СЊ РІ РїСѓСЃС‚РѕР№ РјР°СЃСЃРёРІ СѓР·РµР» СЃ РёРјРµРЅРµРј - РјР°СЃСЃРёРІ СЃС‚Р°РЅРѕРІРёС‚СЃСЏ С‚Р°Р±Р»РёС†РµР№ }
         if FInfo = 0 then
         begin
           FType := ntTable;
-          { Необходимо узнать индекс нового элемента в хэш-таблице }
+          { РќРµРѕР±С…РѕРґРёРјРѕ СѓР·РЅР°С‚СЊ РёРЅРґРµРєСЃ РЅРѕРІРѕРіРѕ СЌР»РµРјРµРЅС‚Р° РІ С…СЌС€-С‚Р°Р±Р»РёС†Рµ }
           PSCLArray(FValue).FDocument.Find(@Self, AName, LookupIndex);
         end else raise ESCLError.CreateResFmt(@sNoArrayNameAllowd, [AName, GetPath]);
     ntTable:
@@ -418,10 +418,10 @@ begin
         raise ESCLError.CreateResFmt(@sDuplicateItemName, [AName, GetPath]);
     else raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [GetPath, TypeName])
   end;
-  { Проверяем предел количества дочерних элементов }
+  { РџСЂРѕРІРµСЂСЏРµРј РїСЂРµРґРµР» РєРѕР»РёС‡РµСЃС‚РІР° РґРѕС‡РµСЂРЅРёС… СЌР»РµРјРµРЅС‚РѕРІ }
   if FInfo = Smallint.MaxValue then
     raise ESCLError.CreateResFmt(@sTooManyChildItems, [GetPath]);
-  { Вложенные массивы и таблицы запрещены для строчных }
+  { Р’Р»РѕР¶РµРЅРЅС‹Рµ РјР°СЃСЃРёРІС‹ Рё С‚Р°Р±Р»РёС†С‹ Р·Р°РїСЂРµС‰РµРЅС‹ РґР»СЏ СЃС‚СЂРѕС‡РЅС‹С… }
   if (FSubType <> 0) and (AType in [ntArray, ntTable]) then
     raise ESCLError.CreateResFmt(@sNestedInlineError, [GetPath]);
   with PSCLArray(FValue)^ do
@@ -489,10 +489,10 @@ end;
 
 function TSCLNode.AddValue(const AName, Value: string; &Type: TStringType): PSCLNode;
 begin
-  { Строчные массивы и таблицы не допускают переноса строк }
+  { РЎС‚СЂРѕС‡РЅС‹Рµ РјР°СЃСЃРёРІС‹ Рё С‚Р°Р±Р»РёС†С‹ РЅРµ РґРѕРїСѓСЃРєР°СЋС‚ РїРµСЂРµРЅРѕСЃР° СЃС‚СЂРѕРє }
   if (&Type in [stText, stWrapped]) and (FType in [ntEmpty, ntArray, ntTable]) and (FSubType <> 0) then
     raise ESCLError.CreateRes(@sNoTextBlckAllowed);
-  { Добавляем строку в текущий узел }
+  { Р”РѕР±Р°РІР»СЏРµРј СЃС‚СЂРѕРєСѓ РІ С‚РµРєСѓС‰РёР№ СѓР·РµР» }
   Result := AddChild(AName, ntString);
   Result.FSubType := Byte(&Type);
   PString(@Result.FValue)^ := Value;
@@ -548,10 +548,10 @@ procedure TSCLNode.ForceType(RequiredType: TSCLNodeType);
 begin
   if FType <> RequiredType then
   begin
-    { Нельзя таким образом сделать массив или таблицу }
+    { РќРµР»СЊР·СЏ С‚Р°РєРёРј РѕР±СЂР°Р·РѕРј СЃРґРµР»Р°С‚СЊ РјР°СЃСЃРёРІ РёР»Рё С‚Р°Р±Р»РёС†Сѓ }
     if RequiredType in [ntArray, ntTable] then
       raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [FName, TypeName]);
-    { Изменить тип можно только у новых узлов }
+    { РР·РјРµРЅРёС‚СЊ С‚РёРї РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ Сѓ РЅРѕРІС‹С… СѓР·Р»РѕРІ }
     if FType <> ntEmpty then
       raise ESCLError.CreateResFmt(@sInvalidValueType, [FName, TypeName, SCLTypeNames[RequiredType]]);
     FType := RequiredType;
@@ -623,7 +623,7 @@ begin
     var Item := FParent.FirstChild;
     repeat
       if Item = @Self then
-        Exit; // мы нашли нужный узел
+        Exit; // РјС‹ РЅР°С€Р»Рё РЅСѓР¶РЅС‹Р№ СѓР·РµР»
       Item := Item.FNext;
       Inc(Result);
     until Item = nil;
@@ -648,12 +648,12 @@ begin
   TypeCheck(ntTable);
   var LookupIndex: Integer;
   var Document := PSCLArray(FValue).FDocument;
-  { Иначе ищем соответствующий узел в хэш-таблице }
+  { РРЅР°С‡Рµ РёС‰РµРј СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёР№ СѓР·РµР» РІ С…СЌС€-С‚Р°Р±Р»РёС†Рµ }
   if Document.Find(@Self, AName, LookupIndex) then
   begin
     Result := Document.FLookup[LookupIndex];
     Result.TypeCheck(RequiredType);
-  end else // если не нашли нужный узел, то создаём его
+  end else // РµСЃР»Рё РЅРµ РЅР°С€Р»Рё РЅСѓР¶РЅС‹Р№ СѓР·РµР», С‚Рѕ СЃРѕР·РґР°С‘Рј РµРіРѕ
     Result := AddChild(AName, RequiredType, LookupIndex);
 end;
 
@@ -667,7 +667,7 @@ begin
   SCLNameBuilder.Reset.Append('/');
   var Count := 0;
   var Node := PSCLNode(@Self);
-  { Добавляем все узлы в стек, кроме корневого }
+  { Р”РѕР±Р°РІР»СЏРµРј РІСЃРµ СѓР·Р»С‹ РІ СЃС‚РµРє, РєСЂРѕРјРµ РєРѕСЂРЅРµРІРѕРіРѕ }
   while Node.FParent <> nil do
   begin
     if Count >= Length(NodeStack) then
@@ -752,21 +752,21 @@ begin
       #00: Break;
       '@':
         begin
-          { Читаем индекс элемента в массиве }
+          { Р§РёС‚Р°РµРј РёРЅРґРµРєСЃ СЌР»РµРјРµРЅС‚Р° РІ РјР°СЃСЃРёРІРµ }
           var NodeIndex := 0;
           repeat
             Inc(Path);
             var Digit := AsDigit(Path^);
-            if Digit > 9 then Break; // цифры закончились
+            if Digit > 9 then Break; // С†РёС„СЂС‹ Р·Р°РєРѕРЅС‡РёР»РёСЃСЊ
             NodeIndex := NodeIndex * 10 + Digit;
           until NodeIndex > SmallInt.MaxValue;
-          { При выходе по условию цикла - Path будет указывать на цифру }
+          { РџСЂРё РІС‹С…РѕРґРµ РїРѕ СѓСЃР»РѕРІРёСЋ С†РёРєР»Р° - Path Р±СѓРґРµС‚ СѓРєР°Р·С‹РІР°С‚СЊ РЅР° С†РёС„СЂСѓ }
           case Path^ of
             #00: ;
             '/': Inc(Path);
             else raise ESCLError.CreateResFmt(@sInvalidNodePath, [NodePath]);
           end;
-          { Идём по элементам до нужного }
+          { РРґС‘Рј РїРѕ СЌР»РµРјРµРЅС‚Р°Рј РґРѕ РЅСѓР¶РЅРѕРіРѕ }
           Result.TypeCheck(ntArray);
           Result := Result.FirstChild;
           while (NodeIndex > 0) and (Result <> nil) do
@@ -778,7 +778,7 @@ begin
     else
       var From := Path;
       var Last := ValidateNodeName(Path);
-      { Проверяем следующий разделитель на валидность }
+      { РџСЂРѕРІРµСЂСЏРµРј СЃР»РµРґСѓСЋС‰РёР№ СЂР°Р·РґРµР»РёС‚РµР»СЊ РЅР° РІР°Р»РёРґРЅРѕСЃС‚СЊ }
       case Last^ of
         #00: Path := Last;
         '/': Path := Last + 1;
@@ -943,7 +943,7 @@ function TSCLNode.ToString: string;
     var DateTimeValue: TDateTime := PDateTime(@FValue)^;
     var DateType := dtUTC;
     case FInfo of
-      -1: { Если время локальное, то проверяем на упрощённый формат }
+      -1: { Р•СЃР»Рё РІСЂРµРјСЏ Р»РѕРєР°Р»СЊРЅРѕРµ, С‚Рѕ РїСЂРѕРІРµСЂСЏРµРј РЅР° СѓРїСЂРѕС‰С‘РЅРЅС‹Р№ С„РѕСЂРјР°С‚ }
           if Trunc(DateTimeValue) = 0 then
             DateType := dtTimeOnly
           else if (Frac(DateTimeValue) = 0) then
@@ -1004,7 +1004,7 @@ begin
   if (Current <> nil) and (Current.Prev <> nil) then
     DefaultSize := Length(Current.Data) shl 1;
   {$IFDEF CPU64BITS}
-  if DefaultSize > Integer.MaxValue div 2 then // недостижимо при компиляции в 32-х битном режиме
+  if DefaultSize > Integer.MaxValue div 2 then // РЅРµРґРѕСЃС‚РёР¶РёРјРѕ РїСЂРё РєРѕРјРїРёР»СЏС†РёРё РІ 32-С… Р±РёС‚РЅРѕРј СЂРµР¶РёРјРµ
     raise ESCLError.CreateRes(@sMaxDocSizeExceed);
   {$ENDIF}
   New(Result);
@@ -1020,38 +1020,38 @@ end;
 
 procedure TSCLDocument.Clear;
 begin
-  { Проверка на пустой документ }
+  { РџСЂРѕРІРµСЂРєР° РЅР° РїСѓСЃС‚РѕР№ РґРѕРєСѓРјРµРЅС‚ }
   if IsEmpty then Exit;
-  { Обнуляем всю существующую структуру документа }
+  { РћР±РЅСѓР»СЏРµРј РІСЃСЋ СЃСѓС‰РµСЃС‚РІСѓСЋС‰СѓСЋ СЃС‚СЂСѓРєС‚СѓСЂСѓ РґРѕРєСѓРјРµРЅС‚Р° }
   FHashed := 0;
-  FNextIndex := 1; // сохраняем FRoot
-  { Удаляем все хранилища узлов, кроме первого }
+  FNextIndex := 1; // СЃРѕС…СЂР°РЅСЏРµРј FRoot
+  { РЈРґР°Р»СЏРµРј РІСЃРµ С…СЂР°РЅРёР»РёС‰Р° СѓР·Р»РѕРІ, РєСЂРѕРјРµ РїРµСЂРІРѕРіРѕ }
   while FNodeArray.Prev <> nil do
   begin
     var Next := FNodeArray.Prev;
     Dispose(FNodeArray);
     FNodeArray := Next;
   end;
-  { Обрезаем и обнуляем таблицу хэшей со ссылками на элементы }
+  { РћР±СЂРµР·Р°РµРј Рё РѕР±РЅСѓР»СЏРµРј С‚Р°Р±Р»РёС†Сѓ С…СЌС€РµР№ СЃРѕ СЃСЃС‹Р»РєР°РјРё РЅР° СЌР»РµРјРµРЅС‚С‹ }
   var Length := Length(FNodeArray.Data);
   SetLength(FLookup, Length);
   FillChar(FLookup[0], Length * SizeOf(PSCLNode), 0);
-  { Обнуляем первичное хранилище данных, включая корневой элемент }
+  { РћР±РЅСѓР»СЏРµРј РїРµСЂРІРёС‡РЅРѕРµ С…СЂР°РЅРёР»РёС‰Рµ РґР°РЅРЅС‹С…, РІРєР»СЋС‡Р°СЏ РєРѕСЂРЅРµРІРѕР№ СЌР»РµРјРµРЅС‚ }
   Finalize(FNodeArray.Data[0], Length);
   FillChar(PByte(FNodeArray.Data)^, Length * SizeOf(FNodeArray.Data[0]), 0);
-  { Заного инициализируем значения стандартных узлов }
+  { Р—Р°РЅРѕРіРѕ РёРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј Р·РЅР°С‡РµРЅРёСЏ СЃС‚Р°РЅРґР°СЂС‚РЅС‹С… СѓР·Р»РѕРІ }
   FRootNode.FType := ntArray;
   FRootNode.FValue := CreateArray;
 end;
 
 constructor TSCLDocument.Create(Capacity: Integer);
 begin
-  { Выделяем память под элементы и индексы }
+  { Р’С‹РґРµР»СЏРµРј РїР°РјСЏС‚СЊ РїРѕРґ СЌР»РµРјРµРЅС‚С‹ Рё РёРЅРґРµРєСЃС‹ }
   Capacity := NextPowerOfTwo(Capacity, MINIMUM_STORE_ITEMS);
   FNodeArray := TNodeArray.Create(nil, Capacity);
   SetLength(FLookup, Capacity);
   FillChar(FLookup[0], Length(FLookup) * SizeOf(PSCLNode), 0);
-  { Создаём основную таблицу документа и пустую ноду }
+  { РЎРѕР·РґР°С‘Рј РѕСЃРЅРѕРІРЅСѓСЋ С‚Р°Р±Р»РёС†Сѓ РґРѕРєСѓРјРµРЅС‚Р° Рё РїСѓСЃС‚СѓСЋ РЅРѕРґСѓ }
   FRootNode := CreateNode(nil, ntArray, -1);
 end;
 
@@ -1062,21 +1062,21 @@ end;
 
 function TSCLDocument.CreateNode(AParent: Pointer; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
 begin
-  { Проверяем что у нас достаточно свободных элементов }
+  { РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ Сѓ РЅР°СЃ РґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃРІРѕР±РѕРґРЅС‹С… СЌР»РµРјРµРЅС‚РѕРІ }
   if FNextIndex >= Length(FNodeArray.Data) then
   begin
     FNodeArray := TNodeArray.Create(FNodeArray, Length(FNodeArray.Data));
     FNextIndex := 0;
   end;
-  { Резервируем новый элемент }
+  { Р РµР·РµСЂРІРёСЂСѓРµРј РЅРѕРІС‹Р№ СЌР»РµРјРµРЅС‚ }
   Result := @FNodeArray.Data[FNextIndex];
   Result.FParent := AParent;
   Result.FType := AType;
   Inc(FNextIndex);
-  { Для таблиц и массивов создаём дополнительный элемент }
+  { Р”Р»СЏ С‚Р°Р±Р»РёС† Рё РјР°СЃСЃРёРІРѕРІ СЃРѕР·РґР°С‘Рј РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Р№ СЌР»РµРјРµРЅС‚ }
   if AType in [ntArray, ntTable] then
     Result.FValue := CreateArray;
-  { Для таблиц дополнительно обновляем хэш-таблицу }
+  { Р”Р»СЏ С‚Р°Р±Р»РёС† РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ РѕР±РЅРѕРІР»СЏРµРј С…СЌС€-С‚Р°Р±Р»РёС†Сѓ }
   if LookupIndex >= 0 then
   begin
     FLookup[LookupIndex] := Result;
@@ -1102,30 +1102,30 @@ begin
   var From := Integer(Hash and Mask);
   var Step := Integer(Hash shr 8 and Mask or 1);
   Index := From;
-  { Ищем по хэшу с индекса From и шагом Step }
+  { РС‰РµРј РїРѕ С…СЌС€Сѓ СЃ РёРЅРґРµРєСЃР° From Рё С€Р°РіРѕРј Step }
   repeat
     if FLookup[Index] = nil then
-      Exit(False) // элемент отсутствует в таблице
+      Exit(False) // СЌР»РµРјРµРЅС‚ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РІ С‚Р°Р±Р»РёС†Рµ
     else if (FLookup[Index].FParent = Parent) and ASCIISameName(FLookup[Index].FName, Name) then
-      Exit(True); // элемент найден
-    Index := (Index + Step) and Mask; // следующий шаг
+      Exit(True); // СЌР»РµРјРµРЅС‚ РЅР°Р№РґРµРЅ
+    Index := (Index + Step) and Mask; // СЃР»РµРґСѓСЋС‰РёР№ С€Р°Рі
   until Index = From;
-  { По идее сюда мы не попадём никогда! }
+  { РџРѕ РёРґРµРµ СЃСЋРґР° РјС‹ РЅРµ РїРѕРїР°РґС‘Рј РЅРёРєРѕРіРґР°! }
   raise ESCLError.CreateRes(@sLookupTableIsFull);
 end;
 
 procedure TSCLDocument.GrowAndRehash;
 begin
-  { Создаём новый массив индексов }
+  { РЎРѕР·РґР°С‘Рј РЅРѕРІС‹Р№ РјР°СЃСЃРёРІ РёРЅРґРµРєСЃРѕРІ }
   var Rehashed: TArray<PSCLNode>;
   var HashSize := Length(FLookup);
   {$IFDEF CPU64BITS}
-  if HashSize > Integer.MaxValue div 2 then // недостижимо при компиляции в 32-х битном режиме
+  if HashSize > Integer.MaxValue div 2 then // РЅРµРґРѕСЃС‚РёР¶РёРјРѕ РїСЂРё РєРѕРјРїРёР»СЏС†РёРё РІ 32-С… Р±РёС‚РЅРѕРј СЂРµР¶РёРјРµ
     raise ESCLError.CreateRes(@sMaxHashSizeExceed);
   {$ENDIF}
   SetLength(Rehashed, HashSize shl 1);
   FillChar(Rehashed[0], Length(Rehashed) * SizeOf(PSCLNode), 0);
-  { Перераспределяем элементы из старого массива в новый }
+  { РџРµСЂРµСЂР°СЃРїСЂРµРґРµР»СЏРµРј СЌР»РµРјРµРЅС‚С‹ РёР· СЃС‚Р°СЂРѕРіРѕ РјР°СЃСЃРёРІР° РІ РЅРѕРІС‹Р№ }
   var Mask: Cardinal := High(FLookup);
   for var Index := 0 to Mask do
   begin

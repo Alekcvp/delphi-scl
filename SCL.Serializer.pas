@@ -1,4 +1,4 @@
-unit SCL.Serializer;
+п»їunit SCL.Serializer;
 
 {******************************************************************************}
 {  Delphi-SCL - Simple Config Language Library                                 }
@@ -138,12 +138,12 @@ uses
   System.DateUtils, System.TimeSpan, SCL.Common;
 
 resourcestring
-  sArraySizeMismatch = 'Размер данных (%d) не соответствует размеру массива (%d)';
-  sCharacterRequired = 'Вместо символа обнаружена строка';
-  sNodeNameRequired  = 'Имя узла не может быть пустой строкой';
-  sReqrdValueMissing = 'Отсутствует требуемое значение: ''%s''';
-  sUnknownEnumValue  = 'Неизвестное значение ''%s'' для типа %s';
-  sValueTypeNotSupp  = 'Тип данных ''%s'' не поддерживается';
+  sArraySizeMismatch = 'Р Р°Р·РјРµСЂ РґР°РЅРЅС‹С… (%d) РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ СЂР°Р·РјРµСЂСѓ РјР°СЃСЃРёРІР° (%d)';
+  sCharacterRequired = 'Р’РјРµСЃС‚Рѕ СЃРёРјРІРѕР»Р° РѕР±РЅР°СЂСѓР¶РµРЅР° СЃС‚СЂРѕРєР°';
+  sNodeNameRequired  = 'РРјСЏ СѓР·Р»Р° РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚РѕР№ СЃС‚СЂРѕРєРѕР№';
+  sReqrdValueMissing = 'РћС‚СЃСѓС‚СЃС‚РІСѓРµС‚ С‚СЂРµР±СѓРµРјРѕРµ Р·РЅР°С‡РµРЅРёРµ: ''%s''';
+  sUnknownEnumValue  = 'РќРµРёР·РІРµСЃС‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ ''%s'' РґР»СЏ С‚РёРїР° %s';
+  sValueTypeNotSupp  = 'РўРёРї РґР°РЅРЅС‹С… ''%s'' РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ';
 
 type
   HBytes = record helper for TBytes
@@ -354,7 +354,7 @@ begin
   var ItemType := ArrayType.ElementType;
   if ItemType.Handle = TypeInfo(Byte) then
   begin
-    { Динамический массив байт читаем как байтовую строку }
+    { Р”РёРЅР°РјРёС‡РµСЃРєРёР№ РјР°СЃСЃРёРІ Р±Р°Р№С‚ С‡РёС‚Р°РµРј РєР°Рє Р±Р°Р№С‚РѕРІСѓСЋ СЃС‚СЂРѕРєСѓ }
     var Bytes := Node.AsBytes;
     var Count := Length(Bytes);
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
@@ -373,7 +373,7 @@ begin
     Move(PByte(Chars)^, PPointer(Data)^^, Count);
   end else
   begin
-    { Обычный динамический массив }
+    { РћР±С‹С‡РЅС‹Р№ РґРёРЅР°РјРёС‡РµСЃРєРёР№ РјР°СЃСЃРёРІ }
     var Bytes := ArrayType.ElementSize;
     var Count := Node.Count;
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
@@ -475,7 +475,7 @@ begin
   var ItemType := ArrayType.ElementType;
   if ItemType.Handle = TypeInfo(Byte) then
   begin
-    { Динамический массив байт читаем как байтовую строку }
+    { Р”РёРЅР°РјРёС‡РµСЃРєРёР№ РјР°СЃСЃРёРІ Р±Р°Р№С‚ С‡РёС‚Р°РµРј РєР°Рє Р±Р°Р№С‚РѕРІСѓСЋ СЃС‚СЂРѕРєСѓ }
     var Bytes := Node.AsBytes;
     var Count := Length(Bytes);
     if ArrayType.TotalElementCount <> Count then
@@ -583,10 +583,10 @@ begin
   var ItemType := ArrayType.ElementType;
   var ItemData := PByte(PPointer(Data)^);
   if ItemType.Handle = TypeInfo(Byte) then
-    { Массив байт пишем в бинарное значение }
+    { РњР°СЃСЃРёРІ Р±Р°Р№С‚ РїРёС€РµРј РІ Р±РёРЅР°СЂРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ }
     ParentNode.AddValue(Attrs.Name, TBytes.Create(ItemData, DynArraySize(ItemData)))
   else if ItemType.Handle = TypeInfo(WideChar) then
-    { Массивы символов пишем в обычную строку }
+    { РњР°СЃСЃРёРІС‹ СЃРёРјРІРѕР»РѕРІ РїРёС€РµРј РІ РѕР±С‹С‡РЅСѓСЋ СЃС‚СЂРѕРєСѓ }
     ParentNode.AddValue(Attrs.Name, StringFromCharArray(PWideChar(ItemData), DynArraySize(ItemData)))
   else if ItemType.Handle = TypeInfo(AnsiChar) then
     ParentNode.AddValue(Attrs.Name, StringFromCharArray(PAnsiChar(ItemData), DynArraySize(ItemData)))
@@ -617,7 +617,7 @@ begin
     otUByte: ValueName := GetEnumName(AType.Handle, PByte(Data)^);
     otSWord: ValueName := GetEnumName(AType.Handle, PSmallInt(Data)^);
     otUWord: ValueName := GetEnumName(AType.Handle, PWord(Data)^);
-    { Максимальное количество элементов в перечисляемом типе равно 2^31 - 1 }
+    { РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ СЌР»РµРјРµРЅС‚РѕРІ РІ РїРµСЂРµС‡РёСЃР»СЏРµРјРѕРј С‚РёРїРµ СЂР°РІРЅРѕ 2^31 - 1 }
     else ValueName := GetEnumName(AType.Handle, PInteger(Data)^);
   end;
   var TypeName := string(AType.Name) + '.';
@@ -707,16 +707,16 @@ begin
   var ArrayType := AType as TRttiArrayType;
   var ItemType := ArrayType.ElementType;
   if ItemType.Handle = TypeInfo(Byte) then
-    { Массив байт пишем в бинарное значение }
+    { РњР°СЃСЃРёРІ Р±Р°Р№С‚ РїРёС€РµРј РІ Р±РёРЅР°СЂРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ }
     ParentNode.AddValue(Attrs.Name, TBytes.Create(Data, ArrayType.TotalElementCount))
   else if ItemType.Handle = TypeInfo(WideChar) then
-    { Массивы символов пишем в обычную строку }
+    { РњР°СЃСЃРёРІС‹ СЃРёРјРІРѕР»РѕРІ РїРёС€РµРј РІ РѕР±С‹С‡РЅСѓСЋ СЃС‚СЂРѕРєСѓ }
     ParentNode.AddValue(Attrs.Name, StringFromCharArray(PWideChar(Data), ArrayType.TotalElementCount))
   else if ItemType.Handle = TypeInfo(AnsiChar) then
     ParentNode.AddValue(Attrs.Name, StringFromCharArray(PAnsiChar(Data), ArrayType.TotalElementCount))
   else
   begin
-    { Иначе записываем массив поэлементно }
+    { РРЅР°С‡Рµ Р·Р°РїРёСЃС‹РІР°РµРј РјР°СЃСЃРёРІ РїРѕСЌР»РµРјРµРЅС‚РЅРѕ }
     var ItemSize := ArrayType.TypeSize div ArrayType.TotalElementCount;
     var ItemData := PByte(Data);
     if Attrs <> nil then

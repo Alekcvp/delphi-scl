@@ -1,4 +1,4 @@
-unit SCL.Common;
+п»їunit SCL.Common;
 
 {******************************************************************************}
 {  Delphi-SCL - Simple Config Language Library                                 }
@@ -14,7 +14,7 @@ unit SCL.Common;
 
 interface
 
-{$Q-} // переполнение не баг, а полезная фича
+{$Q-} // РїРµСЂРµРїРѕР»РЅРµРЅРёРµ РЅРµ Р±Р°Рі, Р° РїРѕР»РµР·РЅР°СЏ С„РёС‡Р°
 
 uses
   System.SysUtils;
@@ -27,7 +27,7 @@ type
     function SubString(Last: PChar): string; inline;
   end;
 
-  { Стек отступов для уровней документа }
+  { РЎС‚РµРє РѕС‚СЃС‚СѓРїРѕРІ РґР»СЏ СѓСЂРѕРІРЅРµР№ РґРѕРєСѓРјРµРЅС‚Р° }
   TIndentStack = record
   private const
     DEFAULT_STACK_SIZE = 16;
@@ -43,7 +43,7 @@ type
      property Value: Integer read GetValue;
   end;
 
-  { Облегчённый кастомный вариант TStringBuilder'а }
+  { РћР±Р»РµРіС‡С‘РЅРЅС‹Р№ РєР°СЃС‚РѕРјРЅС‹Р№ РІР°СЂРёР°РЅС‚ TStringBuilder'Р° }
   TStringBuffer = class
   private const
     DEFAULT_BUFFER_SIZE = 256;
@@ -56,7 +56,7 @@ type
   public
     constructor Create;
      function Append(const Str: string): TStringBuffer; overload; inline;
-     function Append(Buf: PChar; Count: Integer): TStringBuffer; overload; inline; { TODO: проверить как работает inline }
+     function Append(Buf: PChar; Count: Integer): TStringBuffer; overload; inline; { TODO: РїСЂРѕРІРµСЂРёС‚СЊ РєР°Рє СЂР°Р±РѕС‚Р°РµС‚ inline }
      function Append(Ch: Char): TStringBuffer; overload; inline;
      function AppendLineBreak: TStringBuffer; inline;
      function Bookmark: TStringBuffer; inline;
@@ -78,16 +78,16 @@ const
   HexChars: array [0..15] of Char = '0123456789ABCDEF';
 
   ESCAPE_NOT = $00;
-  ESCAPE_CHR = $10; // экранирование подстановкой (\r\n)
-  ESCAPE_ORD = $20; // экранирование кодом (\x00)
+  ESCAPE_CHR = $10; // СЌРєСЂР°РЅРёСЂРѕРІР°РЅРёРµ РїРѕРґСЃС‚Р°РЅРѕРІРєРѕР№ (\r\n)
+  ESCAPE_ORD = $20; // СЌРєСЂР°РЅРёСЂРѕРІР°РЅРёРµ РєРѕРґРѕРј (\x00)
 
   STR_VALID  = $00;
   STR_BREAK  = $01;
   STR_QUOTE  = $02;
   STR_ESCAPE = $04;
 
-  // Запись обычной строки: StringMap[Ch] and $F0
-  // Все остальные строки:  StringMap[Ch] and $0F
+  // Р—Р°РїРёСЃСЊ РѕР±С‹С‡РЅРѕР№ СЃС‚СЂРѕРєРё: StringMap[Ch] and $F0
+  // Р’СЃРµ РѕСЃС‚Р°Р»СЊРЅС‹Рµ СЃС‚СЂРѕРєРё:  StringMap[Ch] and $0F
   StringMap: TASCIIMap = (
   {  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F   }
     $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $1F, $10, $11, $1F, $1F, $11, $2F, $2F, // 0
@@ -103,10 +103,10 @@ const
 implementation
 
 resourcestring
-  sBufferOversize = 'Запрошен недопустимый размер буфера';
+  sBufferOversize = 'Р—Р°РїСЂРѕС€РµРЅ РЅРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°';
 
 const
-  { Таблица разрешённых символов для имён узлов }
+  { РўР°Р±Р»РёС†Р° СЂР°Р·СЂРµС€С‘РЅРЅС‹С… СЃРёРјРІРѕР»РѕРІ РґР»СЏ РёРјС‘РЅ СѓР·Р»РѕРІ }
   NameMap: TASCIIMap = (
   {  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F    }
     $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, // 0
@@ -119,15 +119,15 @@ const
     $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $FF, $FF, $FF, $FF, $FF  // 7
   );
 
-{ Допустимый набор символов в соответствии с NameMap: 0..9, _, A..Z, a..z }
+{ Р”РѕРїСѓСЃС‚РёРјС‹Р№ РЅР°Р±РѕСЂ СЃРёРјРІРѕР»РѕРІ РІ СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРё СЃ NameMap: 0..9, _, A..Z, a..z }
 function ASCIISameName(const A, B: string): Boolean;
 begin
-  { Тривиальные случаи: пустые строки или разные длины строк }
+  { РўСЂРёРІРёР°Р»СЊРЅС‹Рµ СЃР»СѓС‡Р°Рё: РїСѓСЃС‚С‹Рµ СЃС‚СЂРѕРєРё РёР»Рё СЂР°Р·РЅС‹Рµ РґР»РёРЅС‹ СЃС‚СЂРѕРє }
   var Source := PByte(A);
   if (Source = nil) or (A.Length <> B.Length) then Exit(Source = nil);
-  { Получаем указатели на строки как на массив слов и смещение }
+  { РџРѕР»СѓС‡Р°РµРј СѓРєР°Р·Р°С‚РµР»Рё РЅР° СЃС‚СЂРѕРєРё РєР°Рє РЅР° РјР°СЃСЃРёРІ СЃР»РѕРІ Рё СЃРјРµС‰РµРЅРёРµ }
   var Index: NativeInt := PByte(B) - Source;
-  { Сравниваем без учёта регистра }
+  { РЎСЂР°РІРЅРёРІР°РµРј Р±РµР· СѓС‡С‘С‚Р° СЂРµРіРёСЃС‚СЂР° }
   while (Source^ <> 0) and ((Source^ xor Source[Index]) and $DF = 0) do
     Inc(Source, SizeOf(Char));
   Result := Source[Index] = 0;

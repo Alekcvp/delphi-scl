@@ -1,4 +1,4 @@
-unit SCL.Reader;
+п»їunit SCL.Reader;
 
 {******************************************************************************}
 {  Delphi-SCL - Simple Config Language Library                                 }
@@ -14,7 +14,7 @@ unit SCL.Reader;
 
 interface
 
-{$Q-} // переполнение не баг, а полезная фича
+{$Q-} // РїРµСЂРµРїРѕР»РЅРµРЅРёРµ РЅРµ Р±Р°Рі, Р° РїРѕР»РµР·РЅР°СЏ С„РёС‡Р°
 
 uses
   {$IFDEF MSWINDOWS} Winapi.Windows, {$ENDIF} System.SysUtils, SCL.Common, SCL.Document;
@@ -67,14 +67,14 @@ type
 
   TSCLReader = class
   private
-    FFileName: string;          // имя исходного файла с документом
-    FCursor: PChar;             // текущее положение в документе
-    FDocEnd: PChar;             // конец текста (завершающий #0)
-    FIndent: TIndentStack;      // стек с отступами уровней
-    FInlineEnd: Char;           // символ завершения строчного массива или таблицы
-    FLineIndex: Integer;        // индекс текущей строки (с 0)
-    FLineStart: PChar;          // начало текущей строки
-    FStringBuf: TStringBuffer;  // буфер для чтения строк и текста
+    FFileName: string;          // РёРјСЏ РёСЃС…РѕРґРЅРѕРіРѕ С„Р°Р№Р»Р° СЃ РґРѕРєСѓРјРµРЅС‚РѕРј
+    FCursor: PChar;             // С‚РµРєСѓС‰РµРµ РїРѕР»РѕР¶РµРЅРёРµ РІ РґРѕРєСѓРјРµРЅС‚Рµ
+    FDocEnd: PChar;             // РєРѕРЅРµС† С‚РµРєСЃС‚Р° (Р·Р°РІРµСЂС€Р°СЋС‰РёР№ #0)
+    FIndent: TIndentStack;      // СЃС‚РµРє СЃ РѕС‚СЃС‚СѓРїР°РјРё СѓСЂРѕРІРЅРµР№
+    FInlineEnd: Char;           // СЃРёРјРІРѕР» Р·Р°РІРµСЂС€РµРЅРёСЏ СЃС‚СЂРѕС‡РЅРѕРіРѕ РјР°СЃСЃРёРІР° РёР»Рё С‚Р°Р±Р»РёС†С‹
+    FLineIndex: Integer;        // РёРЅРґРµРєСЃ С‚РµРєСѓС‰РµР№ СЃС‚СЂРѕРєРё (СЃ 0)
+    FLineStart: PChar;          // РЅР°С‡Р°Р»Рѕ С‚РµРєСѓС‰РµР№ СЃС‚СЂРѕРєРё
+    FStringBuf: TStringBuffer;  // Р±СѓС„РµСЂ РґР»СЏ С‡С‚РµРЅРёСЏ СЃС‚СЂРѕРє Рё С‚РµРєСЃС‚Р°
   protected
      function EncodeSource(const Buffer: TBytes; Encoding: TEncoding): string;
      function ReadSourceFromFile(const AFileName: string): string;
@@ -111,41 +111,41 @@ type
 implementation
 
 resourcestring
-  sDocumentEncodingError = '%s: %s при преобразовании кодировки';
+  sDocumentEncodingError = '%s: %s РїСЂРё РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРё РєРѕРґРёСЂРѕРІРєРё';
   sDocumentParsingError  = '%s(%d, %d): %s';
-  sDocumentReadingError  = 'Ошибка чтения "%s". %s';
+  sDocumentReadingError  = 'РћС€РёР±РєР° С‡С‚РµРЅРёСЏ "%s". %s';
 
-  sCommentNotAllowedHere = 'Комментарии внутри строчных массивов и таблиц не допускаются';
-  sDateDecodingFailed    = 'Не удалось декодировать дату';
-  sEmptyNamesNotAllowed  = 'Пустые имена узлов не допускаются';
-  sExponentOutOfRange    = 'Значение экспоненты вне допустимых пределов';
-  sExponentValueMissing  = 'Отсутствует значение экспоненты';
-  sFractionPartMissing   = 'Отсутствует значение дробной части';
-  sIllegalCharacter      = 'Недопустимый символ';
-  sIllegalCharacterCode  = 'Недопустимый код символа';
-  sIllegalEscapeSequence = 'Неизвестная экранированная последовательность';
-  sInvalidIndentStack    = 'Внутренняя ошибка в стеке уровней документа';
-  sInlineTextNotAllowed  = 'Текстовые блоки в строчных массивах и таблицах не допускаются';
-  sIntegerPartMissing    = 'Отсутствует значение целой части числа';
-  sInvalidBinaryLength   = 'Неверная длина двоичной последовательности';
-  sInvalidDateTimeFormat = 'Неверный формат даты или времени';
-  sInvalidDateTimeValue  = 'Недопустимое значение даты или времени';
-  sInvalidGroupSeparator = 'Недопустимое расположение разделителя групп';
-  sInvalidLineEnding     = 'Неверная последовательность завершения строки';
-  sInvalidNameCharacter  = 'Недопустимый символ в имени узла';
-  sInvalidValueDelimiter = 'Неверный разделитель значений';
-  sInvalidValueIndent    = 'Неверный отступ для значения';
-  sLeadingZeroNotAllowed = 'Ведущие нули не допускаются';
-  sNestedValueNotAllowed = 'Вложенные массивы и таблицы не допускаются';
-  sNodeNameColonRequired = 'Имя узла должно завершаться символом '':''';
-  sTimeDecodingFailed    = 'Не удалось декодировать время';
-  sUnexpectedEndOfFile   = 'Неожиданный конец файла';
-  sUnexpectedEndOfLine   = 'Перенос строки в строчных массивах и таблицах не допускается';
-  sUnknownIdentifier     = 'Неизвестный идентификатор';
-  sUnknownParsingError   = 'Внутренняя ошибка парсера';
-  sUnterminatedInline    = 'Обнаружен незавершенный строчный массив или таблица';
-  sUnterminatedString    = 'Обнаружена незавершённая строка';
-  sValueOutOfRange       = 'Значение выходит за допустимые пределы';
+  sCommentNotAllowedHere = 'РљРѕРјРјРµРЅС‚Р°СЂРёРё РІРЅСѓС‚СЂРё СЃС‚СЂРѕС‡РЅС‹С… РјР°СЃСЃРёРІРѕРІ Рё С‚Р°Р±Р»РёС† РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sDateDecodingFailed    = 'РќРµ СѓРґР°Р»РѕСЃСЊ РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ РґР°С‚Сѓ';
+  sEmptyNamesNotAllowed  = 'РџСѓСЃС‚С‹Рµ РёРјРµРЅР° СѓР·Р»РѕРІ РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sExponentOutOfRange    = 'Р—РЅР°С‡РµРЅРёРµ СЌРєСЃРїРѕРЅРµРЅС‚С‹ РІРЅРµ РґРѕРїСѓСЃС‚РёРјС‹С… РїСЂРµРґРµР»РѕРІ';
+  sExponentValueMissing  = 'РћС‚СЃСѓС‚СЃС‚РІСѓРµС‚ Р·РЅР°С‡РµРЅРёРµ СЌРєСЃРїРѕРЅРµРЅС‚С‹';
+  sFractionPartMissing   = 'РћС‚СЃСѓС‚СЃС‚РІСѓРµС‚ Р·РЅР°С‡РµРЅРёРµ РґСЂРѕР±РЅРѕР№ С‡Р°СЃС‚Рё';
+  sIllegalCharacter      = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР»';
+  sIllegalCharacterCode  = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ РєРѕРґ СЃРёРјРІРѕР»Р°';
+  sIllegalEscapeSequence = 'РќРµРёР·РІРµСЃС‚РЅР°СЏ СЌРєСЂР°РЅРёСЂРѕРІР°РЅРЅР°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ';
+  sInvalidIndentStack    = 'Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РІ СЃС‚РµРєРµ СѓСЂРѕРІРЅРµР№ РґРѕРєСѓРјРµРЅС‚Р°';
+  sInlineTextNotAllowed  = 'РўРµРєСЃС‚РѕРІС‹Рµ Р±Р»РѕРєРё РІ СЃС‚СЂРѕС‡РЅС‹С… РјР°СЃСЃРёРІР°С… Рё С‚Р°Р±Р»РёС†Р°С… РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sIntegerPartMissing    = 'РћС‚СЃСѓС‚СЃС‚РІСѓРµС‚ Р·РЅР°С‡РµРЅРёРµ С†РµР»РѕР№ С‡Р°СЃС‚Рё С‡РёСЃР»Р°';
+  sInvalidBinaryLength   = 'РќРµРІРµСЂРЅР°СЏ РґР»РёРЅР° РґРІРѕРёС‡РЅРѕР№ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё';
+  sInvalidDateTimeFormat = 'РќРµРІРµСЂРЅС‹Р№ С„РѕСЂРјР°С‚ РґР°С‚С‹ РёР»Рё РІСЂРµРјРµРЅРё';
+  sInvalidDateTimeValue  = 'РќРµРґРѕРїСѓСЃС‚РёРјРѕРµ Р·РЅР°С‡РµРЅРёРµ РґР°С‚С‹ РёР»Рё РІСЂРµРјРµРЅРё';
+  sInvalidGroupSeparator = 'РќРµРґРѕРїСѓСЃС‚РёРјРѕРµ СЂР°СЃРїРѕР»РѕР¶РµРЅРёРµ СЂР°Р·РґРµР»РёС‚РµР»СЏ РіСЂСѓРїРї';
+  sInvalidLineEnding     = 'РќРµРІРµСЂРЅР°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ Р·Р°РІРµСЂС€РµРЅРёСЏ СЃС‚СЂРѕРєРё';
+  sInvalidNameCharacter  = 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР» РІ РёРјРµРЅРё СѓР·Р»Р°';
+  sInvalidValueDelimiter = 'РќРµРІРµСЂРЅС‹Р№ СЂР°Р·РґРµР»РёС‚РµР»СЊ Р·РЅР°С‡РµРЅРёР№';
+  sInvalidValueIndent    = 'РќРµРІРµСЂРЅС‹Р№ РѕС‚СЃС‚СѓРї РґР»СЏ Р·РЅР°С‡РµРЅРёСЏ';
+  sLeadingZeroNotAllowed = 'Р’РµРґСѓС‰РёРµ РЅСѓР»Рё РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sNestedValueNotAllowed = 'Р’Р»РѕР¶РµРЅРЅС‹Рµ РјР°СЃСЃРёРІС‹ Рё С‚Р°Р±Р»РёС†С‹ РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ';
+  sNodeNameColonRequired = 'РРјСЏ СѓР·Р»Р° РґРѕР»Р¶РЅРѕ Р·Р°РІРµСЂС€Р°С‚СЊСЃСЏ СЃРёРјРІРѕР»РѕРј '':''';
+  sTimeDecodingFailed    = 'РќРµ СѓРґР°Р»РѕСЃСЊ РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ РІСЂРµРјСЏ';
+  sUnexpectedEndOfFile   = 'РќРµРѕР¶РёРґР°РЅРЅС‹Р№ РєРѕРЅРµС† С„Р°Р№Р»Р°';
+  sUnexpectedEndOfLine   = 'РџРµСЂРµРЅРѕСЃ СЃС‚СЂРѕРєРё РІ СЃС‚СЂРѕС‡РЅС‹С… РјР°СЃСЃРёРІР°С… Рё С‚Р°Р±Р»РёС†Р°С… РЅРµ РґРѕРїСѓСЃРєР°РµС‚СЃСЏ';
+  sUnknownIdentifier     = 'РќРµРёР·РІРµСЃС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ';
+  sUnknownParsingError   = 'Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїР°СЂСЃРµСЂР°';
+  sUnterminatedInline    = 'РћР±РЅР°СЂСѓР¶РµРЅ РЅРµР·Р°РІРµСЂС€РµРЅРЅС‹Р№ СЃС‚СЂРѕС‡РЅС‹Р№ РјР°СЃСЃРёРІ РёР»Рё С‚Р°Р±Р»РёС†Р°';
+  sUnterminatedString    = 'РћР±РЅР°СЂСѓР¶РµРЅР° РЅРµР·Р°РІРµСЂС€С‘РЅРЅР°СЏ СЃС‚СЂРѕРєР°';
+  sValueOutOfRange       = 'Р—РЅР°С‡РµРЅРёРµ РІС‹С…РѕРґРёС‚ Р·Р° РґРѕРїСѓСЃС‚РёРјС‹Рµ РїСЂРµРґРµР»С‹';
 
 type
   TSCLTokenType = (tkNone, tkArrayItem, tkNodeName);
@@ -157,10 +157,10 @@ type
 const
   DOUBLE_MAX_EXP = 308;
   DOUBLE_MIN_EXP = -324;
-  DOUBLE_MAX_INT = 9007199254740991; // максимальное целое значение в Double
+  DOUBLE_MAX_INT = 9007199254740991; // РјР°РєСЃРёРјР°Р»СЊРЅРѕРµ С†РµР»РѕРµ Р·РЅР°С‡РµРЅРёРµ РІ Double
 
 var
-  HexToBinTable: TBytes = nil; // таблица для быстрых 16-ричных преобразований
+  HexToBinTable: TBytes = nil; // С‚Р°Р±Р»РёС†Р° РґР»СЏ Р±С‹СЃС‚СЂС‹С… 16-СЂРёС‡РЅС‹С… РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёР№
 
 function SameToken(var Source: PChar; Token: PChar): Boolean;
 begin
@@ -222,17 +222,17 @@ const
   UTF16LE: array [0..1] of Byte = ($FF, $FE);
   UTF16BE: array [0..1] of Byte = ($FE, $FF);
 begin
-  { Валидный не пустой SCL-документ не может быть короче 3х байт }
+  { Р’Р°Р»РёРґРЅС‹Р№ РЅРµ РїСѓСЃС‚РѕР№ SCL-РґРѕРєСѓРјРµРЅС‚ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РєРѕСЂРѕС‡Рµ 3С… Р±Р°Р№С‚ }
   if Count < 3 then
     Exit(TEncoding.UTF8);
-  { Проверяем наличие BOM }
+  { РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ BOM }
   if SameBytes(@Buffer[0], UTF8BOM) then
     Exit(TEncoding.UTF8);
   if SameBytes(@Buffer[0], UTF16LE) then
     Exit(TEncoding.Unicode);
   if SameBytes(@Buffer[0], UTF16BE) then
     Exit(TEncoding.BigEndianUnicode);
-  { В UTF-16 с большой вероятностью встретится нулевой байт, который недопустим в UTF-8 }
+  { Р’ UTF-16 СЃ Р±РѕР»СЊС€РѕР№ РІРµСЂРѕСЏС‚РЅРѕСЃС‚СЊСЋ РІСЃС‚СЂРµС‚РёС‚СЃСЏ РЅСѓР»РµРІРѕР№ Р±Р°Р№С‚, РєРѕС‚РѕСЂС‹Р№ РЅРµРґРѕРїСѓСЃС‚РёРј РІ UTF-8 }
   for var Index := 0 to Min(15, Count - 1) do
     if Buffer[Index] = 0 then
       if Index and $01 <> 0 then
@@ -266,7 +266,7 @@ constructor TSCLReader.Create;
 begin
   if Length(HexToBinTable) = 0 then
   begin
-    { Инициализируем таблицу шестнадцатеричных преобразований }
+    { РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј С‚Р°Р±Р»РёС†Сѓ С€РµСЃС‚РЅР°РґС†Р°С‚РµСЂРёС‡РЅС‹С… РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёР№ }
     SetLength(HexToBinTable, $10000);
     FillChar(PByte(HexToBinTable)^, Length(HexToBinTable), $FF);
     for var Index := Ord('0') to Ord('9') do
@@ -323,23 +323,23 @@ const
   NestedTypes: array [Boolean] of TSCLNodeType = (ntTable, ntArray);
   LW_ARRAY_ITEM = $0020002D;
 begin
-  { Проверяем отступ текущего элемента }
+  { РџСЂРѕРІРµСЂСЏРµРј РѕС‚СЃС‚СѓРї С‚РµРєСѓС‰РµРіРѕ СЌР»РµРјРµРЅС‚Р° }
   ValidateIndent(ParentNode);
   case FCursor[1] of
     #10, #13, '#', #32: ;
     else RaiseParsingError(peIllegalCharacter);
   end;
   FCursor := SkipSpaces(FCursor + 1);
-  { Проверяем на вложенный массив или таблицу }
+  { РџСЂРѕРІРµСЂСЏРµРј РЅР° РІР»РѕР¶РµРЅРЅС‹Р№ РјР°СЃСЃРёРІ РёР»Рё С‚Р°Р±Р»РёС†Сѓ }
   var IsNestedArray := PLongWord(FCursor)^ = LW_ARRAY_ITEM;
   if IsNestedArray or (SkipSpaces(ValidateNodeName(FCursor))^ = ':') then
   begin
     ParentNode := ParentNode.AddNode(string.Empty, NestedTypes[IsNestedArray]);
     Exit(False);
   end;
-  { Читаем значение элемента }
+  { Р§РёС‚Р°РµРј Р·РЅР°С‡РµРЅРёРµ СЌР»РµРјРµРЅС‚Р° }
   ParseNodeValue(ParentNode, string.Empty);
-  { Мы завершили чтение строки, можно идти дальше }
+  { РњС‹ Р·Р°РІРµСЂС€РёР»Рё С‡С‚РµРЅРёРµ СЃС‚СЂРѕРєРё, РјРѕР¶РЅРѕ РёРґС‚Рё РґР°Р»СЊС€Рµ }
   Result := True;
 end;
 
@@ -371,27 +371,27 @@ procedure TSCLReader.ParseInlineValue(ParentNode: PSCLNode);
 const
   ValueDelims: array [Boolean] of Char = (',', ';');
 begin
-  { Строчные контейнеры не могут быть вложенными }
+  { РЎС‚СЂРѕС‡РЅС‹Рµ РєРѕРЅС‚РµР№РЅРµСЂС‹ РЅРµ РјРѕРіСѓС‚ Р±С‹С‚СЊ РІР»РѕР¶РµРЅРЅС‹РјРё }
   if FInlineEnd <> #32 then
     RaiseParsingError(peNestedValueNotAllowed);
   FInlineEnd := Char(Word(FCursor^) + 2);
-  { Параметры для чтения строчного контейнера }
+  { РџР°СЂР°РјРµС‚СЂС‹ РґР»СЏ С‡С‚РµРЅРёСЏ СЃС‚СЂРѕС‡РЅРѕРіРѕ РєРѕРЅС‚РµР№РЅРµСЂР° }
   var ReadNames := FInlineEnd = '}';
   var Delimeter := ValueDelims[ReadNames];
   var ValueName := string.Empty;
-  { Проверяем на завершающую скобку }
+  { РџСЂРѕРІРµСЂСЏРµРј РЅР° Р·Р°РІРµСЂС€Р°СЋС‰СѓСЋ СЃРєРѕР±РєСѓ }
   if NextToken(FCursor, 1) <> FInlineEnd then
   repeat
-    { Для таблиц читаем имя узла }
+    { Р”Р»СЏ С‚Р°Р±Р»РёС† С‡РёС‚Р°РµРј РёРјСЏ СѓР·Р»Р° }
     if ReadNames and (FCursor^ <> '#') then
       ValueName := ReadNodeName(True);
-    { Дальше читаем данные }
+    { Р”Р°Р»СЊС€Рµ С‡РёС‚Р°РµРј РґР°РЅРЅС‹Рµ }
     if FCursor^ = '#' then
       RaiseParsingError(peCommentNotAllowedHere);
     ParseNodeValue(ParentNode, ValueName);
-    { Требуется разделитель или завершающая скобка }
+    { РўСЂРµР±СѓРµС‚СЃСЏ СЂР°Р·РґРµР»РёС‚РµР»СЊ РёР»Рё Р·Р°РІРµСЂС€Р°СЋС‰Р°СЏ СЃРєРѕР±РєР° }
     if FCursor^ <> Delimeter then Break;
-    { Пропускаем разделитель элементов }
+    { РџСЂРѕРїСѓСЃРєР°РµРј СЂР°Р·РґРµР»РёС‚РµР»СЊ СЌР»РµРјРµРЅС‚РѕРІ }
     FCursor := SkipSpaces(FCursor + 1);
   until False;
   case FCursor^ of
@@ -401,7 +401,7 @@ begin
       RaiseParsingError(peInvalidValueDelimiter);
   end;
   FInlineEnd := #32;
-  Inc(FCursor); // пропускаем ']' / '}'
+  Inc(FCursor); // РїСЂРѕРїСѓСЃРєР°РµРј ']' / '}'
 end;
 
 procedure TSCLReader.ParseNodeValue(var ParentNode: PSCLNode; const Name: string);
@@ -425,7 +425,7 @@ const
 begin
   var NextChar := FCursor^;
   case NextChar of
-    #10, #13, '#': ParentNode := ParentNode.AddArray(Name, False); // у нас новый дочерний узел
+    #10, #13, '#': ParentNode := ParentNode.AddArray(Name, False); // Сѓ РЅР°СЃ РЅРѕРІС‹Р№ РґРѕС‡РµСЂРЅРёР№ СѓР·РµР»
     '0': case FCursor[1] of
            'b': ParentNode.AddValue(Name, ReadBaseTwo(FCursor + 2, 1), nbBin);
            'o': ParentNode.AddValue(Name, ReadBaseTwo(FCursor + 2, 3), nbOct);
@@ -455,7 +455,7 @@ begin
     '|': ParentNode.AddValue(Name, ReadText(FStringBuf.LineBreak), stText);
     '>': ParentNode.AddValue(Name, ReadText(#32), stWrapped);
   else
-    { Специальные значения без учёта регистра }
+    { РЎРїРµС†РёР°Р»СЊРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ Р±РµР· СѓС‡С‘С‚Р° СЂРµРіРёСЃС‚СЂР° }
     case Char(Word(NextChar) or $20) of
       'f': ValidateValue('?alse', False);
       'i': ValidateValue('?nf', Double.PositiveInfinity);
@@ -469,7 +469,7 @@ begin
       else RaiseParsingError(ParsingErrors[FCursor^ < #32]);
     end;
   end;
-  { Пропускаем комментарии в конце строки }
+  { РџСЂРѕРїСѓСЃРєР°РµРј РєРѕРјРјРµРЅС‚Р°СЂРёРё РІ РєРѕРЅС†Рµ СЃС‚СЂРѕРєРё }
   if NextToken(FCursor) = '#' then
     FCursor := SkipToLineEnd(FCursor);
 end;
@@ -481,7 +481,7 @@ procedure TSCLReader.ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Inte
     Result := 0;
     var NextChar := Source;
     var Ch := NextChar^;
-    { Число не может начинаться с разделителя групп }
+    { Р§РёСЃР»Рѕ РЅРµ РјРѕР¶РµС‚ РЅР°С‡РёРЅР°С‚СЊСЃСЏ СЃ СЂР°Р·РґРµР»РёС‚РµР»СЏ РіСЂСѓРїРї }
     if Ch = '`' then
       RaiseParsingError(peInvalidGroupSeparator);
     repeat
@@ -494,7 +494,7 @@ procedure TSCLReader.ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Inte
         end else RaiseParsingError(peValueOutOfRange)
       else if Ch <> '`' then
         Break
-      { После разделителя групп обязательно должна идти цифра }
+      { РџРѕСЃР»Рµ СЂР°Р·РґРµР»РёС‚РµР»СЏ РіСЂСѓРїРї РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РґРѕР»Р¶РЅР° РёРґС‚Рё С†РёС„СЂР° }
       else if AsDigit(NextChar[1]) > 9 then
         RaiseParsingError(peInvalidGroupSeparator);
       Inc(NextChar);
@@ -507,7 +507,7 @@ procedure TSCLReader.ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Inte
   const
     MaxExponent: array [-1..1] of Integer = (324, 0, 308);
   begin
-    { Пропускаем символ экспоненты и читаем знак }
+    { РџСЂРѕРїСѓСЃРєР°РµРј СЃРёРјРІРѕР» СЌРєСЃРїРѕРЅРµРЅС‚С‹ Рё С‡РёС‚Р°РµРј Р·РЅР°Рє }
     Inc(Source);
     Result := 0;
     var ExpSign := 1;
@@ -519,19 +519,19 @@ procedure TSCLReader.ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Inte
       '+': Inc(Source);
     end;
     var MaxValue := MaxExponent[ExpSign];
-    { В цикле читаем значение экспоненты }
+    { Р’ С†РёРєР»Рµ С‡РёС‚Р°РµРј Р·РЅР°С‡РµРЅРёРµ СЌРєСЃРїРѕРЅРµРЅС‚С‹ }
     var NextChar := Source;
     repeat
       var Digit := AsDigit(NextChar^);
       if Digit > 9 then
         Break;
       Result := Result * 10 + Digit;
-      { Защита от переполнения }
+      { Р—Р°С‰РёС‚Р° РѕС‚ РїРµСЂРµРїРѕР»РЅРµРЅРёСЏ }
       if Result > MaxValue then
         RaiseParsingError(peExponentOutOfRange, Source);
       Inc(NextChar);
     until False;
-    { Проверяем на отсутствие экспоненты и на ведущие нули }
+    { РџСЂРѕРІРµСЂСЏРµРј РЅР° РѕС‚СЃСѓС‚СЃС‚РІРёРµ СЌРєСЃРїРѕРЅРµРЅС‚С‹ Рё РЅР° РІРµРґСѓС‰РёРµ РЅСѓР»Рё }
     case NextChar - Source of
       0: RaiseParsingError(peExponentValueMissing);
       1: ;
@@ -544,7 +544,7 @@ procedure TSCLReader.ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Inte
 
   function ReadFraction(var Source: PChar; var Value: UInt64): Integer;
   begin
-    { Максимальное значение целой части числа с приемлемой точностью }
+    { РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ С†РµР»РѕР№ С‡Р°СЃС‚Рё С‡РёСЃР»Р° СЃ РїСЂРёРµРјР»РµРјРѕР№ С‚РѕС‡РЅРѕСЃС‚СЊСЋ }
     if Value > DOUBLE_MAX_INT then
       RaiseParsingError(peValueOutOfRange);
     Inc(Source);
@@ -558,16 +558,16 @@ const
 var
   TimeOffset: SmallInt;
 begin
-  { Инициализация и определение знака }
+  { РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Рё РѕРїСЂРµРґРµР»РµРЅРёРµ Р·РЅР°РєР° }
   var Buffer: UInt64 := 0;
   var Exponent := 0;
   var Fraction := 0;
   var LeadZero := FCursor^ = '0';
-  { Читаем целую часть числа }
+  { Р§РёС‚Р°РµРј С†РµР»СѓСЋ С‡Р°СЃС‚СЊ С‡РёСЃР»Р° }
   var Magnitude := ReadInteger(Source, Buffer);
   if Magnitude = 0 then
     RaiseParsingError(peIntegerPartMissing);
-  { Проверяем на дата, время или дробное значение }
+  { РџСЂРѕРІРµСЂСЏРµРј РЅР° РґР°С‚Р°, РІСЂРµРјСЏ РёР»Рё РґСЂРѕР±РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ }
   case Source^ of
     '-': if Magnitude = 4 then
          begin
@@ -589,13 +589,13 @@ begin
     Exponent := ReadExponent(Source);
   if Fraction or Exponent = 0 then
   begin
-    { Целое число без дробной или экспоненциальной части }
+    { Р¦РµР»РѕРµ С‡РёСЃР»Рѕ Р±РµР· РґСЂРѕР±РЅРѕР№ РёР»Рё СЌРєСЃРїРѕРЅРµРЅС†РёР°Р»СЊРЅРѕР№ С‡Р°СЃС‚Рё }
     if Buffer > MaxValues[Sign] then
       RaiseParsingError(peValueOutOfRange);
     Node.SetValue(Int64(Buffer) * Sign);
   end else
   begin
-    { Дробное число или число с экспонентой }
+    { Р”СЂРѕР±РЅРѕРµ С‡РёСЃР»Рѕ РёР»Рё С‡РёСЃР»Рѕ СЃ СЌРєСЃРїРѕРЅРµРЅС‚РѕР№ }
     Magnitude := LongWord(Exponent + Magnitude - DOUBLE_MIN_EXP);
     if Magnitude > DOUBLE_MAX_EXP - DOUBLE_MIN_EXP + 1 then
       RaiseParsingError(peValueOutOfRange);
@@ -607,31 +607,31 @@ end;
 procedure TSCLReader.ParseStructure(Document: TSCLDocument; const ASource: string);
 begin
   Document.Clear;
-  { Инициализируем внутренние переменные }
+  { РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РІРЅСѓС‚СЂРµРЅРЅРёРµ РїРµСЂРµРјРµРЅРЅС‹Рµ }
   FLineIndex := 0;
   FCursor := PChar(ASource);
   FDocEnd := FCursor + ASource.Length;
-  { Пропускаем BOM при его наличии }
+  { РџСЂРѕРїСѓСЃРєР°РµРј BOM РїСЂРё РµРіРѕ РЅР°Р»РёС‡РёРё }
   if FCursor^ = #$FEFF then 
     Inc(FCursor); 
   FLineStart := FCursor;
-  { Парсим содержимое документа }
+  { РџР°СЂСЃРёРј СЃРѕРґРµСЂР¶РёРјРѕРµ РґРѕРєСѓРјРµРЅС‚Р° }
   if FCursor < FDocEnd then
   try
     FIndent.Reset;
-    FInlineEnd := #32; // не #0 чтобы не конфликтовало с концом файла
+    FInlineEnd := #32; // РЅРµ #0 С‡С‚РѕР±С‹ РЅРµ РєРѕРЅС„Р»РёРєС‚РѕРІР°Р»Рѕ СЃ РєРѕРЅС†РѕРј С„Р°Р№Р»Р°
     var CurrentNode := Document.Root;
     repeat
       case NextToken(FCursor) of
-        #00, #13, #10: { Пропускаем };
+        #00, #13, #10: { РџСЂРѕРїСѓСЃРєР°РµРј };
         '#': FCursor := SkipToLineEnd(FCursor);
-        '-': if not ParseArrayItem(CurrentNode) then Continue; // чтение строки не завершено
+        '-': if not ParseArrayItem(CurrentNode) then Continue; // С‡С‚РµРЅРёРµ СЃС‚СЂРѕРєРё РЅРµ Р·Р°РІРµСЂС€РµРЅРѕ
       else
-        { Проверяем отступ текущего элемента }
+        { РџСЂРѕРІРµСЂСЏРµРј РѕС‚СЃС‚СѓРї С‚РµРєСѓС‰РµРіРѕ СЌР»РµРјРµРЅС‚Р° }
         ValidateIndent(CurrentNode);
         ParseNodeValue(CurrentNode, ReadNodeName(True));
       end;
-      { Пытаемся перейти на новую строку }
+      { РџС‹С‚Р°РµРјСЃСЏ РїРµСЂРµР№С‚Рё РЅР° РЅРѕРІСѓСЋ СЃС‚СЂРѕРєСѓ }
       FCursor := SkipLineBreak(FCursor);
       FLineStart := FCursor;
       Inc(FLineIndex);
@@ -708,7 +708,7 @@ end;
 
 function TSCLReader.ReadBinary: TBytes;
 begin
-  var Source := FCursor + 1; // пропустили %
+  var Source := FCursor + 1; // РїСЂРѕРїСѓСЃС‚РёР»Рё %
   var Cursor := Source;
   while HexToBinTable[Word(Cursor^)] < 16 do
     Inc(Cursor);
@@ -782,7 +782,7 @@ begin
   if Last^ = ':' then
   begin
     Result := FCursor.SubString(Next);
-    { Пустые имена узлов не допускаются }
+    { РџСѓСЃС‚С‹Рµ РёРјРµРЅР° СѓР·Р»РѕРІ РЅРµ РґРѕРїСѓСЃРєР°СЋС‚СЃСЏ }
     if Result.IsEmpty then
       RaiseParsingError(peEmptyNamesNotAllowed);
     FCursor := SkipSpaces(Last + 1);
@@ -794,17 +794,17 @@ function TSCLReader.ReadSourceFromFile(const AFileName: string): string;
 var
   Header: array [0..15] of Byte;
 begin
-  { Открываем файл для чтения }
+  { РћС‚РєСЂС‹РІР°РµРј С„Р°Р№Р» РґР»СЏ С‡С‚РµРЅРёСЏ }
   var hSource := FileOpen(AFileName, fmOpenRead or fmShareDenyWrite);
   if hSource = INVALID_HANDLE_VALUE then
     raise ESCLParsingException.CreateResFmt(@sDocumentReadingError, [AFileName, SysErrorMessage(GetLastError)]);
   try
-    { Пытаемся определить кодировку файла }
+    { РџС‹С‚Р°РµРјСЃСЏ РѕРїСЂРµРґРµР»РёС‚СЊ РєРѕРґРёСЂРѕРІРєСѓ С„Р°Р№Р»Р° }
     var Count := FileRead(hSource, Header, Length(Header));
     var Encoding := TEncoding.GuessEncoding(@Header, Count);
     var FileSize := FileSeek(hSource, 0, FILE_END);
     FileSeek(hSource, 0, FILE_BEGIN);
-    { Читаем содержимое файла и при необходимости преобразовываем к Unicode }
+    { Р§РёС‚Р°РµРј СЃРѕРґРµСЂР¶РёРјРѕРµ С„Р°Р№Р»Р° Рё РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РїСЂРµРѕР±СЂР°Р·РѕРІС‹РІР°РµРј Рє Unicode }
     if Encoding = TEncoding.Unicode then
     begin
       SetLength(Result, FileSize shr 1);
@@ -887,7 +887,7 @@ begin
         STR_ESCAPE:
           if Quote = '"' then
           begin
-            { Найден экранированный символ }
+            { РќР°Р№РґРµРЅ СЌРєСЂР°РЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃРёРјРІРѕР» }
             FStringBuf.Append(Source, Cursor - Source);
             Source := AppendSpecialCharacter(Cursor);
           end;
@@ -899,9 +899,9 @@ begin
       end;
     Inc(Cursor);
   until False;
-  { Вовращаем прочитанную строку }
+  { Р’РѕРІСЂР°С‰Р°РµРј РїСЂРѕС‡РёС‚Р°РЅРЅСѓСЋ СЃС‚СЂРѕРєСѓ }
   Result := FStringBuf.Append(Source, Cursor - Source).ToString;
-  FCursor := Cursor + 1; // пропускаем кавычки
+  FCursor := Cursor + 1; // РїСЂРѕРїСѓСЃРєР°РµРј РєР°РІС‹С‡РєРё
 end;
 
 function TSCLReader.ReadText(const LineBreak: string): string;
@@ -909,23 +909,23 @@ begin
   if FInlineEnd <> #32 then
     RaiseParsingError(peInlineTextNotAllowed);
   var IsWrappedString := FCursor^ = '>';
-  Inc(FCursor); // пропускаем '|' / '>'
-  { Пытаемся считать отступ строки [2..8] }
+  Inc(FCursor); // РїСЂРѕРїСѓСЃРєР°РµРј '|' / '>'
+  { РџС‹С‚Р°РµРјСЃСЏ СЃС‡РёС‚Р°С‚СЊ РѕС‚СЃС‚СѓРї СЃС‚СЂРѕРєРё [2..8] }
   var FixedIndent := AsDigit(FCursor^);
   if Word(FixedIndent - 2) > 6 then
     FixedIndent := 0
   else Inc(FCursor);
-  { Пропускаем комментарий в строке при его наличии }
+  { РџСЂРѕРїСѓСЃРєР°РµРј РєРѕРјРјРµРЅС‚Р°СЂРёР№ РІ СЃС‚СЂРѕРєРµ РїСЂРё РµРіРѕ РЅР°Р»РёС‡РёРё }
   if NextToken(FCursor) = '#' then
     FCursor := SkipToLineEnd(FCursor);
-  { Переходим к содержимому текстового блока }
+  { РџРµСЂРµС…РѕРґРёРј Рє СЃРѕРґРµСЂР¶РёРјРѕРјСѓ С‚РµРєСЃС‚РѕРІРѕРіРѕ Р±Р»РѕРєР° }
   var Source := SkipLineBreak(FCursor);
-  { Определяем динамический отступ значений }
+  { РћРїСЂРµРґРµР»СЏРµРј РґРёРЅР°РјРёС‡РµСЃРєРёР№ РѕС‚СЃС‚СѓРї Р·РЅР°С‡РµРЅРёР№ }
   if FixedIndent <> 0 then
     FIndent.Increment(FixedIndent)
   else if not FIndent.SetIndent(SkipSpaces(Source) - Source) then
-    Exit(string.Empty); // конец файла или пустой текстовый блок
-  { Читаем текстовый блок построчно }
+    Exit(string.Empty); // РєРѕРЅРµС† С„Р°Р№Р»Р° РёР»Рё РїСѓСЃС‚РѕР№ С‚РµРєСЃС‚РѕРІС‹Р№ Р±Р»РѕРє
+  { Р§РёС‚Р°РµРј С‚РµРєСЃС‚РѕРІС‹Р№ Р±Р»РѕРє РїРѕСЃС‚СЂРѕС‡РЅРѕ }
   FStringBuf.Reset;
   repeat
     case Source^ of
@@ -943,16 +943,16 @@ begin
         FStringBuf.Append(LineBreak);
       FStringBuf.Bookmark;
     end;
-    { Завершаем перевод строки }
+    { Р—Р°РІРµСЂС€Р°РµРј РїРµСЂРµРІРѕРґ СЃС‚СЂРѕРєРё }
     FCursor := Source;
     FLineStart := Source;
     Inc(FLineIndex);
-    { Переходим на новую строку }
+    { РџРµСЂРµС…РѕРґРёРј РЅР° РЅРѕРІСѓСЋ СЃС‚СЂРѕРєСѓ }
     Source := SkipLineBreak(Source);
   until False;
-  { Уменьшаем оступ для текущего уровня }
+  { РЈРјРµРЅСЊС€Р°РµРј РѕСЃС‚СѓРї РґР»СЏ С‚РµРєСѓС‰РµРіРѕ СѓСЂРѕРІРЅСЏ }
   FIndent.Decrement;
-  { Возвращаем прочитанную строку удаляя пустые переносы строк в конце }
+  { Р’РѕР·РІСЂР°С‰Р°РµРј РїСЂРѕС‡РёС‚Р°РЅРЅСѓСЋ СЃС‚СЂРѕРєСѓ СѓРґР°Р»СЏСЏ РїСѓСЃС‚С‹Рµ РїРµСЂРµРЅРѕСЃС‹ СЃС‚СЂРѕРє РІ РєРѕРЅС†Рµ }
   Result := FStringBuf.Restore.ToString;
 end;
 
@@ -962,7 +962,7 @@ begin
     RaiseParsingError(peInvalidDateTimeFormat);
   var Minute := ReadWord(59, 2);
   var Second: Word := 0;
-  { Секунды опциональны }
+  { РЎРµРєСѓРЅРґС‹ РѕРїС†РёРѕРЅР°Р»СЊРЅС‹ }
   if FCursor^ = ':' then
     Second := ReadWord(59, 2);
   if not TryEncodeTime(Hour, Minute, Second, 0, Result) then
@@ -972,7 +972,7 @@ end;
 function TSCLReader.ReadWord(MaxValue, Length: Word): Word;
 begin
   Result := 0;
-  { Пропускаем первый символ, т.к. это разделитель ('-', ':' и т.п.) }
+  { РџСЂРѕРїСѓСЃРєР°РµРј РїРµСЂРІС‹Р№ СЃРёРјРІРѕР», С‚.Рє. СЌС‚Рѕ СЂР°Р·РґРµР»РёС‚РµР»СЊ ('-', ':' Рё С‚.Рї.) }
   var Source := FCursor + 1;
   for var Index := 1 to Length do
   begin
@@ -994,7 +994,7 @@ end;
 
 function TSCLReader.SkipLineBreak(Source: PChar): PChar;
 begin
-  { Проверяем и пропускаем перевод строки Lf или CrLf }
+  { РџСЂРѕРІРµСЂСЏРµРј Рё РїСЂРѕРїСѓСЃРєР°РµРј РїРµСЂРµРІРѕРґ СЃС‚СЂРѕРєРё Lf РёР»Рё CrLf }
   case Source^ of
     #10: Inc(Source);
     #13: if Source[1] = #10 then Inc(Source, 2)
@@ -1010,7 +1010,7 @@ begin
   var Indent := FCursor - FLineStart;
   if CurrentNode.Count > 0 then
   begin
-    { При необходимости идём назад по уровням }
+    { РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РёРґС‘Рј РЅР°Р·Р°Рґ РїРѕ СѓСЂРѕРІРЅСЏРј }
     while FIndent.Value > Indent do
     begin
       CurrentNode := CurrentNode.Parent;
@@ -1018,10 +1018,10 @@ begin
       if CurrentNode = nil then
         RaiseParsingError(peInvalidIndentStack);
     end;
-    { Проверяем что отступ значения совпадает с текущим уровнем }
+    { РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РѕС‚СЃС‚СѓРї Р·РЅР°С‡РµРЅРёСЏ СЃРѕРІРїР°РґР°РµС‚ СЃ С‚РµРєСѓС‰РёРј СѓСЂРѕРІРЅРµРј }
     if FIndent.Value <> Indent then
       RaiseParsingError(peInvalidValueIndent);
-  { Для пустых контейнеров запоминаем новый отступ }
+  { Р”Р»СЏ РїСѓСЃС‚С‹С… РєРѕРЅС‚РµР№РЅРµСЂРѕРІ Р·Р°РїРѕРјРёРЅР°РµРј РЅРѕРІС‹Р№ РѕС‚СЃС‚СѓРї }
   end else if not FIndent.SetIndent(Indent) then
     RaiseParsingError(peInvalidValueIndent);
 end;
