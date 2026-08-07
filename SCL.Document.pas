@@ -211,19 +211,17 @@ type
     FHashed: Integer;           // количество элементов в хэш-таблице
     FNodeArray: PNodeArray;     // цепочка хранилищ узлов документа
     FNextIndex: Integer;        // индекс следующего свободного узла
-    FRootNode: TSCLNode;        // корневой узел документа
-    FRootArray: TSCLNode;       // табличное хранилище для коневого узла
+    FRootNode: PSCLNode;        // корневой узел документа
      function CreateArray: NativeInt; inline;
      function CreateNode(AParent: Pointer; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
      function Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
-     function GetRootNode: PSCLNode; inline;
     procedure GrowAndRehash;
   public
     constructor Create(Capacity: Integer = 0);
     destructor Destroy; override;
     procedure Clear;
      function IsEmpty: Boolean;
-     property Root: PSCLNode read GetRootNode;
+     property Root: PSCLNode read FRootNode;
   end;
 
 resourcestring
@@ -1050,6 +1048,8 @@ begin
   { Обнуляем первичное хранилище данных }
   Finalize(FNodeArray.Data[0], Length);
   FillChar(PByte(FNodeArray.Data)^, Length * SizeOf(FNodeArray.Data[0]), 0);
+  { Пересоздаём основную таблицу документа }
+  FRootNode := CreateNode(Pointer(Self), ntArray, -1);
 end;
 
 constructor TSCLDocument.Create(Capacity: Integer);
@@ -1059,10 +1059,8 @@ begin
   FNodeArray := TNodeArray.Create(nil, Capacity);
   SetLength(FLookup, Capacity);
   FillChar(FLookup[0], Length(FLookup) * SizeOf(PSCLNode), 0);
-  { Создаём основную таблицу документа и пустую ноду }
-  FRootNode.FType := ntArray;
-  FRootNode.FValue := Int64(@FRootArray.FParent);
-  FRootArray.FParent := Pointer(Self);
+  { Создаём основную таблицу документа  }
+  FRootNode := CreateNode(Pointer(Self), ntArray, -1);
 end;
 
 function TSCLDocument.CreateArray: NativeInt;
@@ -1124,11 +1122,6 @@ begin
   raise ESCLError.CreateRes(@sLookupTableIsFull);
 end;
 
-function TSCLDocument.GetRootNode: PSCLNode;
-begin
-  Result := @FRootNode;
-end;
-
 procedure TSCLDocument.GrowAndRehash;
 begin
   { Создаём новый массив индексов }
@@ -1161,7 +1154,7 @@ end;
 
 function TSCLDocument.IsEmpty: Boolean;
 begin
-  Result := (FRootNode.FType = ntEmpty) and (FRootNode.FInfo = 0) and (FNodeArray.Prev = nil) and (FNextIndex = 0);
+  Result := (FRootNode.FType = ntArray) and (FRootNode.FInfo = 0) and (FNodeArray.Prev = nil) and (FNextIndex = 2);
 end;
 
 initialization
