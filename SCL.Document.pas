@@ -110,7 +110,7 @@ type
      class function AddComment(Node: PSCLNode; const Comment: string): PSCLNode; overload; static;
      function AddComment(const Comment: string): PSCLNode; overload;
      { Добавляет дочерний узел заданного типа }
-     function AddNode(const AName: string; AType: TSCLNodeType): PSCLNode; overload; inline;
+     function AddNode(const AName: string; AType: TSCLNodeType): PSCLNode; inline;
      { Добавляет дочернюю таблицу или массив. Пустой массив может быть преобразован в таблицу. }
      function AddArray(const AName: string; IsInline: Boolean = False): PSCLNode;
      function AddTable(const AName: string; IsInline: Boolean = False): PSCLNode;
@@ -207,12 +207,12 @@ type
       class function Create(Current: PNodeArray; DefaultSize: Integer): PNodeArray; static;
     end;
   private
-    FLookup: TArray<PSCLNode>;
-    FHashed: Integer;
-    FNodeArray: PNodeArray;
-    FNextIndex: Integer;
-    FRootNode: TSCLNode;
-    FRootArray: TSCLNode;
+    FLookup: TArray<PSCLNode>;  // глобальная хэш таблица для таблиц
+    FHashed: Integer;           // количество элементов в хэш-таблице
+    FNodeArray: PNodeArray;     // цепочка хранилищ узлов документа
+    FNextIndex: Integer;        // индекс следующего свободного узла
+    FRootNode: TSCLNode;        // корневой узел документа
+    FRootArray: TSCLNode;       // табличное хранилище для коневого узла
      function CreateArray: NativeInt; inline;
      function CreateNode(AParent: Pointer; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
      function Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
@@ -1039,7 +1039,7 @@ begin
   var Length := Length(FNodeArray.Data);
   SetLength(FLookup, Length);
   FillChar(FLookup[0], Length * SizeOf(PSCLNode), 0);
-  { Обнуляем первичное хранилище данных, включая корневой элемент }
+  { Обнуляем первичное хранилище данных }
   Finalize(FNodeArray.Data[0], Length);
   FillChar(PByte(FNodeArray.Data)^, Length * SizeOf(FNodeArray.Data[0]), 0);
 end;
@@ -1152,7 +1152,7 @@ end;
 
 function TSCLDocument.IsEmpty: Boolean;
 begin
-  Result := (FRootNode.FType = ntEmpty) and (FRootNode.FInfo = 0);
+  Result := (FRootNode.FType = ntEmpty) and (FRootNode.FInfo = 0) and (FNodeArray.Prev = nil) and (FNextIndex = 0);
 end;
 
 initialization
