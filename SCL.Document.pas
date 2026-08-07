@@ -211,17 +211,19 @@ type
     FHashed: Integer;
     FNodeArray: PNodeArray;
     FNextIndex: Integer;
-    FRootNode: PSCLNode;
+    FRootNode: TSCLNode;
+    FRootArray: TSCLNode;
      function CreateArray: NativeInt; inline;
      function CreateNode(AParent: Pointer; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
      function Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
+     function GetRootNode: PSCLNode; inline;
     procedure GrowAndRehash;
   public
     constructor Create(Capacity: Integer = 0);
     destructor Destroy; override;
     procedure Clear;
      function IsEmpty: Boolean;
-     property Root: PSCLNode read FRootNode;
+     property Root: PSCLNode read GetRootNode;
   end;
 
 resourcestring
@@ -737,11 +739,12 @@ end;
 
 function TSCLNode.IsRoot: Boolean;
 begin
-  Result := (FType in [ntEmpty, ntArray, ntTable]) and (FParent = nil);
+  Result := (FType in [ntArray, ntTable]) and (FParent = nil);
 end;
 
 function TSCLNode.ItemByPath(const NodePath: string): PSCLNode;
 begin
+  TypeCheckParent;
   if NodePath.IsEmpty then
     raise ESCLError.CreateResFmt(@sInvalidNodePath, [NodePath]);
   var Path := PPChar(@NodePath)^;
@@ -1024,7 +1027,7 @@ begin
   if IsEmpty then Exit;
   { Обнуляем всю существующую структуру документа }
   FHashed := 0;
-  FNextIndex := 1; // сохраняем FRoot
+  FNextIndex := 0;
   { Удаляем все хранилища узлов, кроме первого }
   while FNodeArray.Prev <> nil do
   begin
@@ -1039,9 +1042,6 @@ begin
   { Обнуляем первичное хранилище данных, включая корневой элемент }
   Finalize(FNodeArray.Data[0], Length);
   FillChar(PByte(FNodeArray.Data)^, Length * SizeOf(FNodeArray.Data[0]), 0);
-  { Заного инициализируем значения стандартных узлов }
-  FRootNode.FType := ntArray;
-  FRootNode.FValue := CreateArray;
 end;
 
 constructor TSCLDocument.Create(Capacity: Integer);
@@ -1052,7 +1052,8 @@ begin
   SetLength(FLookup, Capacity);
   FillChar(FLookup[0], Length(FLookup) * SizeOf(PSCLNode), 0);
   { Создаём основную таблицу документа и пустую ноду }
-  FRootNode := CreateNode(nil, ntArray, -1);
+  FRootNode.FType := ntArray;
+  FRootNode.FValue := Int64(@FRootArray.FParent);
 end;
 
 function TSCLDocument.CreateArray: NativeInt;
@@ -1112,6 +1113,11 @@ begin
   until Index = From;
   { По идее сюда мы не попадём никогда! }
   raise ESCLError.CreateRes(@sLookupTableIsFull);
+end;
+
+function TSCLDocument.GetRootNode: PSCLNode;
+begin
+  Result := @FRootNode;
 end;
 
 procedure TSCLDocument.GrowAndRehash;

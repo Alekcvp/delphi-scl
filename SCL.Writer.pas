@@ -24,7 +24,7 @@ type
 
   TSCLWriter = class
   private const
-    MIN_WRAPPED_WIDTH = 40;
+    MIN_WRAPPED_WIDTH = 32;
   private
     FIndent: TIndentStack;
     FIndentStep: Integer;

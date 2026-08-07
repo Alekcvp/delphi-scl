@@ -7,7 +7,7 @@ This project is developed as a hobby endeavor for fun and learning. It implement
 
 ## SCL Format Description
 
-See the [SCL Format](SCL%20Format.md) file for details.
+See the [SCL Format Description](SCL%20Format.md) file for details.
 
 ## Features
 
@@ -15,6 +15,12 @@ See the [SCL Format](SCL%20Format.md) file for details.
 - No external dependencies
 - Written and tested in Delphi 12
 - MPL 2.0 licensed
+
+## Documentation
+
+For detailed usage instructions, practical examples, and a complete API reference, please see the auto-generated documentation:
+
+[API Documentation & Examples →](APIDescription.md)
 
 ## License
 
