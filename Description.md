@@ -138,7 +138,7 @@ begin
     WriteLn(Server.AsString);
   
   // Поиск по пути
-  Node := Root.ItemByPath('/app/servers/@2'); // '/app/servers/@0' для первого элемента
+  Node := Root.ItemByPath('app/servers/@2'); // 'app/servers/@0' для первого элемента
 end;
 ```
 

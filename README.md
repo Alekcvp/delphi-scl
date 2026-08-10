@@ -20,7 +20,7 @@ See the [SCL Format Description](SCL%20Format.md) file for details.
 
 For detailed usage instructions, practical examples, and a complete API reference, please see the auto-generated documentation:
 
-[API Documentation & Examples →](APIDescription.md)
+[API Documentation & Examples →](Description.md)
 
 ## License
 
