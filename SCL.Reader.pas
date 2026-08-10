@@ -110,6 +110,9 @@ type
 
 implementation
 
+uses
+  SCL.Types;
+
 resourcestring
   sDocumentEncodingError = '%s: %s при преобразовании кодировки';
   sDocumentParsingError  = '%s(%d, %d): %s';

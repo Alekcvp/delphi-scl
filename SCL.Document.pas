@@ -17,7 +17,7 @@ interface
 {$Q-} // переполнение не баг, а полезная фича
 
 uses
-  System.SysUtils, SCL.Common;
+  System.SysUtils, SCL.Common, SCL.Types;
 
 type
   TSCLNodeType = (
@@ -39,12 +39,8 @@ type
   { Не объявляйте данный тип локально, используйте только по ссылке! }
   PSCLNode = ^TSCLNode;
   TSCLNode = record
-  public type
-    TPrecision  = 0..16;
-    TNumberBase = (nbDefault, nbBin, nbHex, nbOct);
-    TStringType = (stDefault, stLiteral, stText, stWrapped);
   private const
-    ShiftValues: array [TNumberBase] of Byte = (0, 1, 4, 3);
+    ShiftValues: array [TSCLNumberBase] of Byte = (0, 1, 4, 3);
   private type
     PBytes = ^TBytes;
     TArrayEnumerator = record
@@ -81,13 +77,13 @@ type
      function GetItemByName(const AName: string): PSCLNode;
      function GetItemIndex: Integer;
      function GetLastChild: PSCLNode;
-     function GetNumberBase: TNumberBase;
+     function GetNumberBase: TSCLNumberBase;
      function GetOrAddNode(const AName: string; RequiredType: TSCLNodeType): PSCLNode;
      function GetPath: string;
-     function GetPrecision: TPrecision;
+     function GetPrecision: TSCLPrecision;
      function GetPrev: PSCLNode;
      function GetString: string; inline;
-     function GetStringType: TStringType;
+     function GetStringType: TSCLStringType;
      function GetTimeOffset: SmallInt;
      function SCLArray: PSCLArray;
      function TypeName: string; inline;
@@ -95,10 +91,10 @@ type
     procedure SetDateTime(const Value: TDateTime); inline;
     procedure SetFloat(const Value: Double); inline;
     procedure SetInteger(const Value: Int64); inline;
-    procedure SetNumberBase(const Value: TNumberBase);
-    procedure SetPrecision(const Value: TPrecision);
+    procedure SetNumberBase(const Value: TSCLNumberBase);
+    procedure SetPrecision(const Value: TSCLPrecision);
     procedure SetString(const Value: string); inline;
-    procedure SetStringType(const Value: TStringType);
+    procedure SetStringType(const Value: TSCLStringType);
     procedure SetTimeOffset(const Value: SmallInt);
     procedure TypeCheck(RequiredType: TSCLNodeType);
     procedure TypeCheckParent;
@@ -116,18 +112,18 @@ type
      function AddTable(const AName: string; IsInline: Boolean = False): PSCLNode;
      { Добавляют узлы разных типов и присваивают им значения }
      function AddValue(const AName: string; const Value: Boolean): PSCLNode; overload;
-     function AddValue(const AName: string; const Value: string; &Type: TStringType = stDefault): PSCLNode; overload;
-     function AddValue(const AName: string; const Value: Int64; Base: TNumberBase = nbDefault): PSCLNode; overload;
-     function AddValue(const AName: string; const Value: Double; APrecision: TPrecision = 16): PSCLNode; overload;
+     function AddValue(const AName: string; const Value: string; &Type: TSCLStringType = stDefault): PSCLNode; overload;
+     function AddValue(const AName: string; const Value: Int64; Base: TSCLNumberBase = nbDefault): PSCLNode; overload;
+     function AddValue(const AName: string; const Value: Double; APrecision: TSCLPrecision = 16): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TBytes): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TDateTime; AOffset: SmallInt = 0): PSCLNode; overload;
     { Присваивает узлу значение и дополнительную информацию в один шаг. Устанавливает тип пустых узлов. }
     procedure SetValue(const Value: Boolean); overload;
-    procedure SetValue(const Value: Double; APrecision: TPrecision = 16); overload;
-    procedure SetValue(const Value: Int64; Base: TNumberBase = nbDefault); overload;
+    procedure SetValue(const Value: Double; APrecision: TSCLPrecision = 16); overload;
+    procedure SetValue(const Value: Int64; Base: TSCLNumberBase = nbDefault); overload;
     procedure SetValue(const Value: TBytes); overload;
     procedure SetValue(const Value: TDateTime; AOffset: SmallInt = 0); overload;
-    procedure SetValue(const Value: string; &Type: TStringType = stDefault); overload;
+    procedure SetValue(const Value: string; &Type: TSCLStringType = stDefault); overload;
     { Присваивает пустому узлу значение Null }
     procedure SetNullValue; inline;
      function GetEnumerator: TArrayEnumerator; inline;
@@ -157,7 +153,7 @@ type
      { Путь к узлу от корневого узла }
      property Path: string read GetPath;
      { Точность числа с плавающей точкой }
-     property Precision: TPrecision read GetPrecision write SetPrecision;
+     property Precision: TSCLPrecision read GetPrecision write SetPrecision;
      { Предыдущий и следующий узлы в текущем контейнере }
      property PrevSibling: PSCLNode read GetPrev;
      property NextSibling: PSCLNode read FNext;
@@ -169,13 +165,13 @@ type
      { Тип узла }
      property NodeType: TSCLNodeType read FType;
      { Система счисления для записи числа }
-     property NumberBase: TNumberBase read GetNumberBase write SetNumberBase;
+     property NumberBase: TSCLNumberBase read GetNumberBase write SetNumberBase;
      { Родительский узел, nil для RootNode и NullNode }
      property Parent: PSCLNode read FParent;
      { Смещение времени для ntDateTime, равно -1 для локального времени }
      property TimeOffset: SmallInt read GetTimeOffset write SetTimeOffset;
      { Тип строки }
-     property StringType: TStringType read GetStringType write SetStringType;
+     property StringType: TSCLStringType read GetStringType write SetStringType;
      { Возвращает дочерний узел соответствующего типа по его имени, при отсутствии создаёт новый }
      property A[const AName: string]: PSCLNode index ntArray    read GetOrAddNode;
      property B[const AName: string]: PSCLNode index ntBoolean  read GetOrAddNode;
@@ -493,7 +489,7 @@ begin
   Result.FSubType := Byte(IsInline);
 end;
 
-function TSCLNode.AddValue(const AName, Value: string; &Type: TStringType): PSCLNode;
+function TSCLNode.AddValue(const AName, Value: string; &Type: TSCLStringType): PSCLNode;
 begin
   { Строчные массивы и таблицы не допускают переноса строк }
   if (&Type in [stText, stWrapped]) and (FType in [ntEmpty, ntArray, ntTable]) and (FSubType and FLAG_INLINE <> 0) then
@@ -510,7 +506,7 @@ begin
   PBoolean(@Result.FValue)^ := Value;
 end;
 
-function TSCLNode.AddValue(const AName: string; const Value: Int64; Base: TNumberBase): PSCLNode;
+function TSCLNode.AddValue(const AName: string; const Value: Int64; Base: TSCLNumberBase): PSCLNode;
 begin
   Result := AddChild(AName, ntInteger);
   Result.FSubType := ShiftValues[Base];
@@ -530,7 +526,7 @@ begin
   PBytes(@Result.FValue)^ := Value;
 end;
 
-function TSCLNode.AddValue(const AName: string; const Value: Double; APrecision: TPrecision): PSCLNode;
+function TSCLNode.AddValue(const AName: string; const Value: Double; APrecision: TSCLPrecision): PSCLNode;
 begin
   Result := AddChild(AName, ntFloat);
   Result.FSubType := APrecision;
@@ -643,10 +639,10 @@ begin
   Result := PSCLArray(FValue).FLast;
 end;
 
-function TSCLNode.GetNumberBase: TNumberBase;
+function TSCLNode.GetNumberBase: TSCLNumberBase;
 begin
   TypeCheck(ntInteger);
-  Result := TNumberBase(FSubType);
+  Result := TSCLNumberBase(FSubType);
 end;
 
 function TSCLNode.GetOrAddNode(const AName: string; RequiredType: TSCLNodeType): PSCLNode;
@@ -693,7 +689,7 @@ begin
   Result := SCLNameBuilder.ToString;
 end;
 
-function TSCLNode.GetPrecision: TPrecision;
+function TSCLNode.GetPrecision: TSCLPrecision;
 begin
   TypeCheck(ntFloat);
   Result := FSubType;
@@ -714,10 +710,10 @@ begin
   Result := PString(@FValue)^;
 end;
 
-function TSCLNode.GetStringType: TStringType;
+function TSCLNode.GetStringType: TSCLStringType;
 begin
   TypeCheck(ntString);
-  Result := TStringType(FSubType);
+  Result := TSCLStringType(FSubType);
 end;
 
 function TSCLNode.GetTimeOffset: SmallInt;
@@ -831,13 +827,13 @@ begin
   ForceType(ntNull);
 end;
 
-procedure TSCLNode.SetNumberBase(const Value: TNumberBase);
+procedure TSCLNode.SetNumberBase(const Value: TSCLNumberBase);
 begin
   TypeCheck(ntInteger);
   FSubType := Byte(Value);
 end;
 
-procedure TSCLNode.SetPrecision(const Value: TPrecision);
+procedure TSCLNode.SetPrecision(const Value: TSCLPrecision);
 begin
   TypeCheck(ntFloat);
   FSubType := Value;
@@ -849,7 +845,7 @@ begin
   PString(@FValue)^ := Value;
 end;
 
-procedure TSCLNode.SetStringType(const Value: TStringType);
+procedure TSCLNode.SetStringType(const Value: TSCLStringType);
 begin
   TypeCheck(ntString);
   FSubType := Byte(Value);
@@ -861,14 +857,14 @@ begin
   FInfo := Value;
 end;
 
-procedure TSCLNode.SetValue(const Value: Double; APrecision: TPrecision);
+procedure TSCLNode.SetValue(const Value: Double; APrecision: TSCLPrecision);
 begin
   ForceType(ntFloat);
   PDouble(@FValue)^ := Value;
   FSubType := APrecision;
 end;
 
-procedure TSCLNode.SetValue(const Value: Int64; Base: TNumberBase);
+procedure TSCLNode.SetValue(const Value: Int64; Base: TSCLNumberBase);
 begin
   ForceType(ntInteger);
   FValue := Value;
@@ -882,7 +878,7 @@ begin
   FInfo := AOffset;
 end;
 
-procedure TSCLNode.SetValue(const Value: string; &Type: TStringType);
+procedure TSCLNode.SetValue(const Value: string; &Type: TSCLStringType);
 begin
   ForceType(ntString);
   PString(@FValue)^ := Value;

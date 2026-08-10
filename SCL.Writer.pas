@@ -59,6 +59,9 @@ type
 
 implementation
 
+uses
+  SCL.Types;
+
 resourcestring
   s2SmallWrapValue = 'Слишком маленькое значение ширины свёрнутой строки (%d)';
   sFileWriteError  = 'Ошибка записи "%s". %s';

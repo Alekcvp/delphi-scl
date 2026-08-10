@@ -15,53 +15,10 @@
 interface
 
 uses
-  System.SysUtils, System.Classes, System.Rtti, System.TypInfo, SCL.Document;
+  System.SysUtils, System.Classes, System.Rtti, System.TypInfo, SCL.Document, SCL.Types;
 
 type
   ESerializeError = class(Exception);
-
-  SCLBaseAttribute = class(TCustomAttribute)
-  private
-    FBase: TSCLNode.TNumberBase;
-  public
-    constructor Create(const ANumberBase: TSCLNode.TNumberBase);
-  end;
-
-  SCLCommentAttribute = class(TCustomAttribute)
-  private
-    FComment: string;
-  public
-    constructor Create(const AComment: string);
-  end;
-
-  SCLInlineAttribute = class(TCustomAttribute)
-  end;
-
-  SCLNameAttribute = class(TCustomAttribute)
-  private
-    FName: string;
-  public
-    constructor Create(const AName: string);
-  end;
-
-  SCLStateAttribute = class(TCustomAttribute)
-  public type
-    TValueState = (vsDefault, vsRequired, vsDontWrite, vsIgnore);
-  private
-    FState: TValueState;
-  public
-    constructor Create(const AState: TValueState);
-  end;
-
-  SCLStringAttribute = class(TCustomAttribute)
-  private
-    FType: TSCLNode.TStringType;
-  public
-    constructor Create(const AStringType: TSCLNode.TStringType);
-  end;
-
-  SCLTimeZoneAttribute = class(TCustomAttribute)
-  end;
 
   PValueAttributes = ^TValueAttributes;
   TValueAttributes = record
@@ -71,8 +28,8 @@ type
     HasComment: Boolean;
     InlineMode: Boolean;
     IsTimeZone: Boolean;
-    NumberBase: TSCLNode.TNumberBase;
-    StringType: TSCLNode.TStringType;
+    NumberBase: TSCLNumberBase;
+    StringType: TSCLStringType;
     constructor Create(const AName: string; const Attributes: TArray<TCustomAttribute>);
   end;
 
@@ -237,43 +194,6 @@ begin
     Move(Buffer^, PByte(Self)^, Count);
 end;
 
-{ SCLBaseAttribute }
-
-constructor SCLBaseAttribute.Create(const ANumberBase: TSCLNode.TNumberBase);
-begin
-  FBase := ANumberBase;
-end;
-
-{ SCLNameAttribute }
-
-constructor SCLNameAttribute.Create(const AName: string);
-begin
-  if AName = '' then
-    raise ESerializeError.CreateRes(@sNodeNameRequired);
-  FName := AName;
-end;
-
-{ SCLCommentAttribute }
-
-constructor SCLCommentAttribute.Create(const AComment: string);
-begin
-  FComment := AComment;
-end;
-
-{ SCLStateAttribute }
-
-constructor SCLStateAttribute.Create(const AState: TValueState);
-begin
-  FState := AState;
-end;
-
-{ SCLStringAttribute }
-
-constructor SCLStringAttribute.Create(const AStringType: TSCLNode.TStringType);
-begin
-  FType := AStringType;
-end;
-
 { TValueAttributes }
 
 constructor TValueAttributes.Create(const AName: string; const Attributes: TArray<TCustomAttribute>);
@@ -283,23 +203,25 @@ begin
   Self := Default(TValueAttributes);
   for var Attribute in Attributes do
     if Attribute is SCLNameAttribute then
-      Name := SCLNameAttribute(Attribute).FName
+      Name := SCLNameAttribute(Attribute).Name
     else if Attribute is SCLBaseAttribute then
-      NumberBase := SCLBaseAttribute(Attribute).FBase
+      NumberBase := SCLBaseAttribute(Attribute).NumberBase
     else if Attribute is SCLCommentAttribute then
     begin
-      Comment := SCLCommentAttribute(Attribute).FComment;
+      Comment := SCLCommentAttribute(Attribute).Comment;
       HasComment := True;
     end else if Attribute is SCLStateAttribute then
-      State := SCLStateAttribute(Attribute).FState
+      State := SCLStateAttribute(Attribute).State
     else if Attribute is SCLStringAttribute then
-      StringType := SCLStringAttribute(Attribute).FType
+      StringType := SCLStringAttribute(Attribute).StringType
     else if Attribute is SCLInlineAttribute then
       InlineMode := True
     else if Attribute is SCLTimeZoneAttribute then
       IsTimeZone := True;
   if Name = '' then
     Name := AName;
+  if Name = '' then
+    raise ESerializeError.CreateRes(@sNodeNameRequired);
 end;
 
 { TSCLSerializer }
