@@ -169,6 +169,7 @@ function SameToken(var Source: PChar; Token: PChar): Boolean;
 begin
   var Index := Source - Token;
   while Token^ = '?' do Inc(Token);
+  { Проверка на Token^ = #0 не нужна, т.к. Word(#0) or $20 = $20 <> Word(#0) всегда! }
   while Word(Token[Index]) or $20 = Word(Token^) do Inc(Token);
   Result := Token^ = #0;
   if Result then
@@ -189,9 +190,9 @@ begin
   Result := Source;
 end;
 
-function NextToken(var Source: PChar; Skip: Integer = 0): Char; inline;
+function NextToken(var Source: PChar): Char; inline;
 begin
-  var Cursor := Source + Skip;
+  var Cursor := Source;
   while Cursor^ = #32 do
     Inc(Cursor);
   Source := Cursor;
@@ -383,7 +384,8 @@ begin
   var Delimeter := ValueDelims[ReadNames];
   var ValueName := string.Empty;
   { Проверяем на завершающую скобку }
-  if NextToken(FCursor, 1) <> FInlineEnd then
+  FCursor := SkipSpaces(FCursor + 1);
+  if FCursor^ <> FInlineEnd then
   repeat
     { Для таблиц читаем имя узла }
     if ReadNames and (FCursor^ <> '#') then

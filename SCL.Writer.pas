@@ -48,6 +48,7 @@ type
     procedure SetLineBreaks(const LineBreak: string); inline;
      function WriteDocument(Document: TSCLDocument): string; overload;
     procedure WriteDocument(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding); overload;
+    class procedure WriteFile(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding);
      { Шаг отступа для каждого нового уровня, от 2 до 8 }
      property IndentStep: Integer read FIndentStep write SetIndentStep;
      { Писать вложенные в массив контейнеры с новой строки }
@@ -212,6 +213,16 @@ begin
     end;
   end;
   FTextBuffer.Append(Source, Cursor - Source + 1).Append('"').Append(Suffix);
+end;
+
+class procedure TSCLWriter.WriteFile(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding);
+begin
+  with Create do
+  try
+    WriteDocument(AFileName, Document, Encoding);
+  finally
+    Free;
+  end;
 end;
 
 procedure TSCLWriter.WriteLiteralString(const Value, Suffix: string);
