@@ -50,7 +50,6 @@ type
   protected
     FBuffer: string;
     FLength: Integer;
-    FBookmark: Integer;
     FLineBreak: string;
      function CheckCapacity(Count: Integer): PChar;
   public
@@ -59,10 +58,9 @@ type
      function Append(Buf: PChar; Count: Integer): TStringBuffer; overload; inline; { TODO: проверить как работает inline }
      function Append(Ch: Char): TStringBuffer; overload; inline;
      function AppendLineBreak: TStringBuffer; inline;
-     function Bookmark: TStringBuffer; inline;
-     function Restore: TStringBuffer; inline;
      function Reset: TStringBuffer; inline;
      function ToString: string; reintroduce;
+     function TrimBreaks: TStringBuffer;
      property Length: Integer read FLength;
      property LineBreak: string read FLineBreak write FLineBreak;
   end;
@@ -206,12 +204,6 @@ begin
   Result := Append(Pointer(FLineBreak), FLineBreak.Length);
 end;
 
-function TStringBuffer.Bookmark: TStringBuffer;
-begin
-  FBookmark := FLength;
-  Result := Self;
-end;
-
 function TStringBuffer.CheckCapacity(Count: Integer): PChar;
 begin
   if FBuffer.Length - FLength < Count then
@@ -227,20 +219,26 @@ end;
 
 function TStringBuffer.Reset: TStringBuffer;
 begin
-  FBookmark := 0;
   FLength := 0;
-  Result := Self;
-end;
-
-function TStringBuffer.Restore: TStringBuffer;
-begin
-  FLength := FBookmark;
   Result := Self;
 end;
 
 function TStringBuffer.ToString: string;
 begin
   SetString(Result, PPChar(@FBuffer)^, FLength);
+end;
+
+function TStringBuffer.TrimBreaks: TStringBuffer;
+begin
+  var Source: PChar := @FBuffer[FLength];
+  for var Index := FLength downto 1 do
+    case Source^ of
+      #10, #13: Dec(Source);
+    else
+      FLength := Index;
+      Break;
+    end;
+  Result := Self;
 end;
 
 { TIndentStack }

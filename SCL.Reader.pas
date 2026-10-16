@@ -910,6 +910,8 @@ begin
 end;
 
 function TSCLReader.ReadText(const LineBreak: string): string;
+type
+  TTrimEmptyState = (tesDefault, tesNone, tesAny);
 begin
   if FInlineEnd <> #32 then
     RaiseParsingError(peInlineTextNotAllowed);
@@ -920,6 +922,18 @@ begin
   if Word(FixedIndent - 2) > 6 then
     FixedIndent := 0
   else Inc(FCursor);
+  { Проверяем режим обрезки пустых строк }
+  var TrimEmptyState := tesDefault;
+  case FCursor^ of
+    '+': begin
+           TrimEmptyState := tesNone;
+           Inc(FCursor);
+         end;
+    '-': begin
+           TrimEmptyState := tesAny;
+           Inc(FCursor);
+         end;
+  end;
   { Пропускаем комментарий в строке при его наличии }
   if NextToken(FCursor) = '#' then
     FCursor := SkipToLineEnd(FCursor);
@@ -936,17 +950,20 @@ begin
     case Source^ of
       #00: Break;
       #13, #10:
-        if not IsWrappedString then
+        if (TrimEmptyState <> tesAny) and not IsWrappedString then
           FStringBuf.Append(LineBreak);
     else
-      var Cursor := Source;
-      for var Index := 1 to FIndent.Value do
-        if Cursor^ = #32 then Inc(Cursor);
-      if Cursor - Source < FIndent.Value then Break;
-      Source := SkipToLineEnd(Cursor);
-      if FStringBuf.AppendLine(Cursor, Source - Cursor, IsWrappedString) then
-        FStringBuf.Append(LineBreak);
-      FStringBuf.Bookmark;
+      { Проверяем количество отступов }
+      var Count := -FIndent.Value;
+      var Start := Source - Count;
+      while (Count < 0) and (Start[Count] = #32) do
+        Inc(Count);
+      if Count <> 0 then Break;
+      { Копируем содержимое строки }
+      Source := SkipToLineEnd(Start);
+      if (Start < Source) or (TrimEmptyState <> tesAny) then
+        if FStringBuf.AppendLine(Start, Source - Start, IsWrappedString) then
+          FStringBuf.Append(LineBreak);
     end;
     { Завершаем перевод строки }
     FCursor := Source;
@@ -957,8 +974,11 @@ begin
   until False;
   { Уменьшаем оступ для текущего уровня }
   FIndent.Decrement;
+  { Обрезаем пустые строки в конце при необходимости }
+  if TrimEmptyState <> tesNone then
+    FStringBuf.TrimBreaks;
   { Возвращаем прочитанную строку удаляя пустые переносы строк в конце }
-  Result := FStringBuf.Restore.ToString;
+  Result := FStringBuf.ToString;
 end;
 
 function TSCLReader.ReadTime(Hour: Word): TDateTime;
