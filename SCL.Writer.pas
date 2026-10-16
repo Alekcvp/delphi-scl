@@ -350,6 +350,9 @@ begin
   FTextBuffer.Append('|');
   if (Source <> nil) and (Source^ = #32) then
     FTextBuffer.Append(IntToStr(FIndentStep));
+  { Если строка завершается переносом строки, то отключаем обрезку }
+  if (Source <> nil) and ((Source^ = #10) or (Source^ = #13))then
+    FTextBuffer.Append('+');
   FTextBuffer.AppendLineBreak;
   { Увеличиваем значение отступа }
   FIndent.Increment(FIndentStep);

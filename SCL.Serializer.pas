@@ -201,10 +201,14 @@ const
   IgnoreStates: array [Boolean] of SCLStateAttribute.TValueState = (vsDontWrite, vsIgnore);
 begin
   Self := Default(TValueAttributes);
+  Name := AName;
   for var Attribute in Attributes do
     if Attribute is SCLNameAttribute then
-      Name := SCLNameAttribute(Attribute).Name
-    else if Attribute is SCLBaseAttribute then
+    begin
+      Name := SCLNameAttribute(Attribute).Name;
+      if Name = '' then
+        raise ESerializeError.CreateRes(@sNodeNameRequired);
+    end else if Attribute is SCLBaseAttribute then
       NumberBase := SCLBaseAttribute(Attribute).NumberBase
     else if Attribute is SCLCommentAttribute then
     begin
@@ -218,10 +222,6 @@ begin
       InlineMode := True
     else if Attribute is SCLTimeZoneAttribute then
       IsTimeZone := True;
-  if Name = '' then
-    Name := AName;
-  if Name = '' then
-    raise ESerializeError.CreateRes(@sNodeNameRequired);
 end;
 
 { TSCLSerializer }
