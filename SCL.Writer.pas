@@ -275,8 +275,8 @@ begin
       end;
     ntTable:
       begin
-        if SpacedNode and (Node.NodeType in [ntArray, ntTable]) or
-          (Node.NodeType = ntString) and (Node.StringType in [stText, stWrapped])
+        if SpacedNode and ((Node.NodeType in [ntArray, ntTable]) or
+          (Node.NodeType = ntString) and (Node.StringType in [stText, stWrapped]))
         then
           FTextBuffer.AppendLineBreak.Indent(FIndent.Value);
         FTextBuffer.Append(Node.Name).Append(': ');
@@ -385,15 +385,19 @@ end;
 
 procedure TSCLWriter.WriteWrappedString(const Value: string);
 
-  function FindWrap(Cursor: PChar; Margin: Integer): PChar;
+  function FindWrap(Source: PChar; WrapLength, Length: Integer): Integer;
   begin
-    if Cursor^ <> #32 then
-      for var Index := 1 to Margin do
-        if (Cursor - Index)^ = #32 then
-          Exit(Cursor - Index)
-        else if (Cursor + Index)^ = #32 then
-          Exit(Cursor + Index);
-    Result := Cursor;
+    Inc(Source, WrapLength);
+    if Source^ = #32 then
+      Exit(WrapLength);
+    for var Index := 1 to WrapLength shr 2 do
+    begin
+      if (Source - Index)^ = #32 then
+        Exit(WrapLength - Index)
+      else if ((Source + Index)^ = #32) or (Index = Length) then
+        Exit(WrapLength + Index);
+    end;
+    Result := 0;
   end;
 
 begin
@@ -409,24 +413,21 @@ begin
   { Ширина текста не может быть меньше чем MIN_WRAPPED_WIDTH }
   var WrapLength := Max(FWrapWidth - FIndent.Value, MIN_WRAPPED_WIDTH);
   var Checkpoint := Source + Value.Length - WrapLength;
-  var Margin := WrapLength shr 2;
   while Source < Checkpoint do
   begin
     FTextBuffer.Indent(FIndent.Value);
-    var WrapSpace := FindWrap(Source + WrapLength, Margin);
-    if WrapSpace^ = #32 then
+    var WrapIndex := FindWrap(Source, WrapLength, Checkpoint - Source);
+    if WrapIndex > 0 then
     begin
-      FTextBuffer.Append(Source, WrapSpace - Source);
-      Source := WrapSpace + 1;
+      FTextBuffer.Append(Source, WrapIndex);
+      Inc(Source, WrapIndex + 1);
     end else
     begin
-      FTextBuffer.Append(Source, WrapSpace - Source).Append('\');
-      Source := WrapSpace;
+      FTextBuffer.Append(Source, WrapLength).Append('\');
+      Inc(Source, WrapLength);
     end;
     FTextBuffer.AppendLineBreak;
   end;
-  { Записываем остаток текста при его наличии }
-  FTextBuffer.Indent(FIndent.Value).Append(Source, Checkpoint + WrapLength - Source).AppendLineBreak;
   { Уменьшаем значение отступа }
   FIndent.Decrement;
 end;
