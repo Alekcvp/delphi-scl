@@ -76,13 +76,12 @@ type
     FLineStart: PChar;          // начало текущей строки
     FStringBuf: TStringBuffer;  // буфер для чтения строк и текста
   protected
-     function EncodeSource(const Buffer: TBytes; Encoding: TEncoding): string;
-     function ReadSourceFromFile(const AFileName: string): string;
+     function ReadSourceFromFile(const AFileName: string): TBytes;
     procedure ParseInlineValue(ParentNode: PSCLNode);
      function ParseArrayItem(var ParentNode: PSCLNode): Boolean;
     procedure ParseNodeValue(var ParentNode: PSCLNode; const Name: string);
     procedure ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Integer = 1);
-    procedure ParseStructure(Document: TSCLDocument; const ASource: string);
+    procedure ParseStructure(Document: TSCLDocument; Source: PChar; Count: Integer);
     procedure RaiseParsingError(Error: TSCLParsingError; TokenPos: PChar = nil);
      function ReadBaseTwo(Source: PChar; Shift: Integer): Int64;
      function ReadBinary: TBytes;
@@ -92,17 +91,14 @@ type
      function ReadText(const LineBreak: string): string;
      function ReadTime(Hour: Word): TDateTime;
      function ReadWord(MaxValue, Length: Word): Word;
-     function SkipLineBreak(Source: PChar): PChar; 
+     function SkipLineBreak(Source: PChar): PChar;
     procedure ValidateIndent(var CurrentNode: PSCLNode);
   public
     constructor Create;
     destructor Destroy; override;
-     function ParseDocument(const Buffer: TBytes): TSCLDocument; overload; inline;
-     function ParseDocument(const Source: string): TSCLDocument; overload;
-    procedure ParseDocument(const Buffer: TBytes; var Document: TSCLDocument); overload;
-    procedure ParseDocument(const Source: string; var Document: TSCLDocument); overload; inline;
-     function ParseFile(const AFileName: string): TSCLDocument; overload; inline;
-    procedure ParseFile(const AFileName: string; var Document: TSCLDocument); overload; inline;
+     function ParseDocument(const Source: string; Document: TSCLDocument = nil): TSCLDocument; overload;
+     function ParseDocument(Document: TSCLDocument; Buffer: PByte; Count: Integer; Encoding: TEncoding = nil): TSCLDocument; overload;
+     function ParseFile(const AFileName: string; Document: TSCLDocument = nil): TSCLDocument; overload;
     procedure SetLineBreaks(const LineBreak: string); inline;
     class function ReadFrom(const AFileName: string): TSCLDocument;
   end;
@@ -115,8 +111,9 @@ uses
 
 resourcestring
   sDocumentEncodingError = '%s: %s при преобразовании кодировки';
-  sDocumentParsingError  = '%s(%d, %d): %s';
+  sDocumentParsingError  = '%s(%d:%d): %s';
   sDocumentReadingError  = 'Ошибка чтения "%s". %s';
+  sDocumentFileTooLarge  = 'Слишком большой размер SCL документа';
 
   sCommentNotAllowedHere = 'Комментарии внутри строчных массивов и таблиц не допускаются';
   sDateDecodingFailed    = 'Не удалось декодировать дату';
@@ -289,37 +286,41 @@ begin
   FStringBuf.Free;
 end;
 
-function TSCLReader.EncodeSource(const Buffer: TBytes; Encoding: TEncoding): string;
+function TSCLReader.ParseDocument(Document: TSCLDocument; Buffer: PByte; Count: Integer; Encoding: TEncoding): TSCLDocument;
+type
+  TGetString = function (const Bytes: array of Byte): string of object;
+  TGetStringHack = function (Data: PByte; High: Integer): string of object;
+var
+  Encoded: string;
+  HackedGetString: TGetString;
 begin
-  if Encoding = TEncoding.Unicode then
-  begin
-    SetString(Result, PChar(Buffer), Length(Buffer) shr 1);
-    Exit;
-  end;
-  Result := Encoding.GetString(Buffer);
-  if Result.IsEmpty and (Length(Buffer) > 0) then
-    raise ESCLParsingException.CreateResFmt(@sDocumentEncodingError, [FFileName, SysErrorMessage(GetLastError)]);
-end;
-
-procedure TSCLReader.ParseDocument(const Buffer: TBytes; var Document: TSCLDocument);
-begin
-  ParseDocument(EncodeSource(Buffer, TEncoding.GuessEncoding(PByte(Buffer), Length(Buffer))), Document);
-end;
-
-function TSCLReader.ParseDocument(const Source: string): TSCLDocument;
-begin
-  Result := TSCLDocument.Create;
+  var DocumentOwner := Document = nil;
+  if DocumentOwner then
+    Document := TSCLDocument.Create;
   try
-    ParseDocument(Source, Result);
+    if Encoding = nil then
+      Encoding := TEncoding.GuessEncoding(Buffer, Count);
+    if Encoding <> TEncoding.Unicode then
+    begin
+      HackedGetString := Encoding.GetString;
+      Encoded := TGetStringHack(HackedGetString)(Buffer, Count - 1);
+      if Encoded.IsEmpty and (Count > 0) then
+        raise ESCLParsingException.CreateResFmt(@sDocumentEncodingError, [FFileName, SysErrorMessage(GetLastError)]);
+      Buffer := PByte(Encoded);
+      Count  := System.Length(Encoded) shl 1;
+    end;
+    ParseStructure(Document, PChar(Buffer), Count shr 1);
   except
-    Result.Free;
+    if DocumentOwner then
+      Document.Free;
     raise;
   end;
+  Result := Document;
 end;
 
-function TSCLReader.ParseDocument(const Buffer: TBytes): TSCLDocument;
+function TSCLReader.ParseDocument(const Source: string; Document: TSCLDocument): TSCLDocument;
 begin
-  Result := ParseDocument(EncodeSource(Buffer, TEncoding.GuessEncoding(PByte(Buffer), Length(Buffer))));
+  Result := ParseDocument(Document, PByte(Source), Source.Length, TEncoding.Unicode);
 end;
 
 function TSCLReader.ParseArrayItem(var ParentNode: PSCLNode): Boolean;
@@ -347,28 +348,11 @@ begin
   Result := True;
 end;
 
-procedure TSCLReader.ParseDocument(const Source: string; var Document: TSCLDocument);
-begin
-  FFileName := '<memory>';
-  ParseStructure(Document, Source);
-end;
-
-function TSCLReader.ParseFile(const AFileName: string): TSCLDocument;
-begin
-  Result := TSCLDocument.Create;
-  try
-    FFileName := ExtractFileName(AFileName);
-    ParseStructure(Result, ReadSourceFromFile(AFileName));
-  except
-    Result.Free;
-    raise;
-  end;
-end;
-
-procedure TSCLReader.ParseFile(const AFileName: string; var Document: TSCLDocument);
+function TSCLReader.ParseFile(const AFileName: string; Document: TSCLDocument): TSCLDocument;
 begin
   FFileName := ExtractFileName(AFileName);
-  ParseStructure(Document, ReadSourceFromFile(AFileName));
+  var Buffer := ReadSourceFromFile(AFileName);
+  Result := ParseDocument(Document, PByte(Buffer), Length(Buffer));
 end;
 
 procedure TSCLReader.ParseInlineValue(ParentNode: PSCLNode);
@@ -609,13 +593,13 @@ begin
   FCursor := Source;
 end;
 
-procedure TSCLReader.ParseStructure(Document: TSCLDocument; const ASource: string);
+procedure TSCLReader.ParseStructure(Document: TSCLDocument; Source: PChar; Count: Integer);
 begin
   Document.Clear;
   { Инициализируем внутренние переменные }
   FLineIndex := 0;
-  FCursor := PChar(ASource);
-  FDocEnd := FCursor + ASource.Length;
+  FCursor := Source;
+  FDocEnd := Source + Count;
   { Пропускаем BOM при его наличии }
   if FCursor^ = #$FEFF then 
     Inc(FCursor); 
@@ -646,6 +630,7 @@ begin
       raise ESCLParsingException.Create(
         FFileName, E.Message, FLineIndex + 1, FCursor - FLineStart + 1, peInternalSCLError) at ExceptAddr();
   end;
+  FFileName := '';
 end;
 
 procedure TSCLReader.RaiseParsingError(Error: TSCLParsingError; TokenPos: PChar);
@@ -795,34 +780,19 @@ begin
     RaiseParsingError(NodeNameErrors[Next^ = #32], Last);
 end;
 
-function TSCLReader.ReadSourceFromFile(const AFileName: string): string;
-var
-  Header: array [0..15] of Byte;
+function TSCLReader.ReadSourceFromFile(const AFileName: string): TBytes;
 begin
   { Открываем файл для чтения }
   var hSource := FileOpen(AFileName, fmOpenRead or fmShareDenyWrite);
   if hSource = INVALID_HANDLE_VALUE then
     raise ESCLParsingException.CreateResFmt(@sDocumentReadingError, [AFileName, SysErrorMessage(GetLastError)]);
   try
-    { Пытаемся определить кодировку файла }
-    var Count := FileRead(hSource, Header, Length(Header));
-    var Encoding := TEncoding.GuessEncoding(@Header, Count);
-    var FileSize := FileSeek(hSource, 0, FILE_END);
-    FileSeek(hSource, 0, FILE_BEGIN);
-    { Читаем содержимое файла и при необходимости преобразовываем к Unicode }
-    if Encoding = TEncoding.Unicode then
-    begin
-      SetLength(Result, FileSize shr 1);
-      if FileRead(hSource, PByte(Result)^, FileSize) <> FileSize then
-        raise ESCLParsingException.CreateResFmt(@sDocumentReadingError, [AFileName, SysErrorMessage(GetLastError)]);
-    end else
-    begin
-      var Buffer: TBytes;
-      SetLength(Buffer, FileSize);
-      if FileRead(hSource, PByte(Buffer)^, FileSize) <> FileSize then
-        raise ESCLParsingException.CreateResFmt(@sDocumentReadingError, [AFileName, SysErrorMessage(GetLastError)]);
-      Result := EncodeSource(Buffer, Encoding)
-    end;
+    var FileSize := GetFileSize(hSource, nil);
+    if FileSize >= Word.MaxValue then
+      raise ESCLParsingException.CreateResFmt(@sDocumentFileTooLarge, [AFileName, SysErrorMessage(GetLastError)]);
+    SetLength(Result, FileSize);
+    if FileRead(hSource, Result[0], FileSize) <> Integer(FileSize) then
+      raise ESCLParsingException.CreateResFmt(@sDocumentReadingError, [AFileName, SysErrorMessage(GetLastError)]);
   finally
     FileClose(hSource);
   end;
