@@ -195,7 +195,7 @@ type
 
   TSCLDocument = class
   private const
-    MINIMUM_STORE_ITEMS = 8;
+    MINIMUM_STORE_ITEMS = 1024;
   private type
     { Используется для снижения фрагментации памяти и исключения копирования массивов данных }
     PNodeArray = ^TNodeArray;
