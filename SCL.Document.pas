@@ -265,7 +265,6 @@ resourcestring
   sConversionFailed  = 'Невозможно преобразовать элемент ''%s'' [%s] к типу ''%s''';
   sDuplicateItemName = 'Элемент ''%s'' уже существует в таблице ''%s''';
   sIllegalNameChars  = 'Недопустимый символ в имени узла: ''%s''';
-  sInvalidChildItem  = 'Элемент ''%s'' не найден в массиве или таблице ''%s''';
   sInvalidItemLink   = 'Недопустимая ссылка на узел документа (nil)';
   sInvalidNodePath   = 'Некорректный путь к узлу: ''%s''';
   sInvalidValueType  = 'Элемент ''%s'' [%s] должен иметь тип ''%s''';
@@ -274,7 +273,6 @@ resourcestring
   sNoArrayNameAllowd = 'Элементы массива не могут иметь ключей';
   sNoCommentInInline = 'Комментарии в строчных массивах и таблицах не допускаются';
   sNodeIsNotAParent  = 'Элемент ''%s'' [%s] не является массивом или таблицей';
-  sNodeStructureErr  = 'Ошибка в структуре дерева узлов SCL';
   sNoParentNodeFound = 'У элемента ''%s'' отсутствует родительский узел';
   sNoRootNodeComment = 'Нельзя добавить комментарий к корневому узлу документа';
   sNoTextBlckAllowed = 'Текстовые блоки не допускаются внутри строчных массивов и таблиц';
@@ -546,23 +544,21 @@ begin
           Target.FValue := Source.FValue;
         end;
       ntBinary:
-        begin
-          { Массив байт }
-          Target.FSubType := Source.FSubType;
-          Target.FInfo := Source.FInfo;
-          PBytes(@Target.FValue)^ := PBytes(@Source.FValue)^;
-        end;
+        { Массив байт }
+        PBytes(@Target.FValue)^ := PBytes(@Source.FValue)^;
       ntString:
         begin
           { Строка }
           Target.FSubType := Source.FSubType;
-          Target.FInfo := Source.FInfo;
           PString(@Target.FValue)^ := PString(@Source.FValue)^;
         end;
       ntArray, ntTable:
-        { Массив или таблица }
-        for var Item in Source^ do
-          Target.MergeNodes(Item);
+        begin
+          { Массив или таблица }
+          Target.FSubType := Source.FSubType and FLAG_INLINE;
+          for var Item in Source^ do
+            Target.MergeNodes(Item);
+        end;
     end;
   end;
 end;
