@@ -487,8 +487,10 @@ begin
   var TypeInfo := PTypeInfo(TypeInfo(T));
   if TypeInfo <> nil then
     if (Name = '') and (TypeInfo.Kind in [tkArray, tkDynArray, tkRecord, tkMRecord]) then
-      FWriterMap[TypeInfo.Kind](Document.Root, nil, @Value, FRTTIContext.GetType(TypeInfo))
-    else
+    begin
+      var EmptyAttrs := TValueAttributes.Create(Name, nil);
+      FWriterMap[TypeInfo.Kind](Document.Root, @EmptyAttrs, @Value, FRTTIContext.GetType(TypeInfo))
+    end else
       WriteValue(Document.Root, Name, nil, @Value, FRTTIContext.GetType(TypeInfo));
 end;
 
