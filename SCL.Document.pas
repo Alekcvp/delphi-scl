@@ -195,15 +195,16 @@ type
 
   TSCLDocument = class
   private const
-    MINIMUM_STORE_ITEMS = 1024;
+    MINIMUM_STORE_ITEMS = 8;
   private type
     { Используется для снижения фрагментации памяти и исключения копирования массивов данных }
     PNodeArray = ^TNodeArray;
     TNodeArray = record
     private
-      Data: TArray<TSCLNode>;
+      Items: TArray<TSCLNode>;
       Prev: PNodeArray;
-      class function Create(Current: PNodeArray; DefaultSize: Integer): PNodeArray; static;
+      function Expand(DefaultCount: Integer): PNodeArray;
+      function Free: PNodeArray;
     end;
   private
     FLookup: TArray<PSCLNode>;  // глобальная хэш таблица для таблиц
@@ -212,9 +213,10 @@ type
     FNextIndex: Integer;        // индекс следующего свободного узла
     FRootNode: PSCLNode;        // корневой узел документа
      function CreateArray: NativeInt; inline;
-     function CreateNode(AParent: Pointer; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
+     function CreateNode(AParent: Pointer; AType: TSCLNodeType): PSCLNode;
      function Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
     procedure GrowAndRehash;
+    procedure InsertHashed(LookupIndex: Integer; Node: PSCLNode);
   public
     constructor Create(Capacity: Integer = 0);
     destructor Destroy; override;
@@ -339,7 +341,7 @@ begin
     { Хеш считается от нижнего регистра (or $20) символов,
       при этом символ '_' ($5F) получает код $7F, который
       сам по себе не допукается в именах ключей. }
-    Result := (LongWord(Key[Index]) or $20 xor Result) * $01000193;
+    Result := (Ord(Key[Index]) or $20 xor Result) * $01000193;
 end;
 
 function IntToBaseTwo(Value: Int64; Shift: Byte): string;
@@ -431,13 +433,16 @@ begin
     raise ESCLError.CreateResFmt(@sNestedInlineError, [GetPath]);
   with PSCLArray(FValue)^ do
   begin
-    Result := FDocument.CreateNode(@Self, AType, LookupIndex);
+    Result := FDocument.CreateNode(@Self, AType);
     Result.FName := AName;
     if FFirst = nil then
       FFirst := Result;
     if FLast <> nil then
       FLast.FNext := Result;
     FLast := Result;
+    { Для таблиц дополнительно обновляем хэш-таблицу }
+    if LookupIndex >= 0 then
+      FDocument.InsertHashed(LookupIndex, Result);
   end;
   Inc(FInfo);
   if (FSubType and FLAG_DATA = 0) and (AType <> ntComment) then
@@ -454,7 +459,7 @@ begin
     raise Exception.CreateRes(@sNoCommentInInline);
   with TSCLNode.PSCLArray(Node.FParent.FValue)^ do
   begin
-    Result := FDocument.CreateNode(Node.FParent, ntComment, -1);
+    Result := FDocument.CreateNode(Node.FParent, ntComment);
     Result.FName := Comment;
     Result.FNext := Node;
     var PrevNode := Node.PrevSibling;
@@ -474,7 +479,7 @@ begin
     raise Exception.CreateRes(@sNoCommentInInline);
   with PSCLArray(FValue)^ do
   begin
-    Result := FDocument.CreateNode(@Self, ntComment, -1);
+    Result := FDocument.CreateNode(@Self, ntComment);
     Result.FName := Comment;
     if FFirst = nil then
       FFirst := Result;
@@ -1053,21 +1058,26 @@ end;
 
 { TSCLDocument.TNodeArray }
 
-class function TSCLDocument.TNodeArray.Create(Current: PNodeArray; DefaultSize: Integer): PNodeArray; 
+function TSCLDocument.TNodeArray.Expand(DefaultCount: Integer): PNodeArray;
 begin
-  if (Current <> nil) and (Current.Prev <> nil) then
-    DefaultSize := Length(Current.Data) shl 1;
+  if (@Self <> nil) and (Prev <> nil) then
+    DefaultCount := Length(Items) shl 1;
   {$IFDEF CPU64BITS}
-  if DefaultSize > Integer.MaxValue div 2 then // недостижимо при компиляции в 32-х битном режиме
+  if DefaultCount > Integer.MaxValue shr 5 then // недостижимо при компиляции в 32-х битном режиме
     raise ESCLError.CreateRes(@sMaxDocSizeExceed);
   {$ENDIF}
   New(Result);
-  with Result^ do
-  begin
-    Prev := Current;
-    SetLength(Data, DefaultSize);
-    FillChar(PByte(Data)^, DefaultSize * SizeOf(Data[0]), 0);
-  end;
+  Result.Prev := @Self;
+  SetLength(Result.Items, DefaultCount);
+  FillChar(Result.Items[0], DefaultCount * SizeOf(TSCLNode), 0);
+end;
+
+function TSCLDocument.TNodeArray.Free: PNodeArray;
+begin
+  var pSelf := PNodeArray(@Self);
+  if pSelf = nil then Exit(nil);
+  Result := pSelf.Prev;
+  Dispose(pSelf);
 end;
 
 { TSCLDocument }
@@ -1081,62 +1091,50 @@ begin
   FNextIndex := 0;
   { Удаляем все хранилища узлов, кроме первого }
   while FNodeArray.Prev <> nil do
-  begin
-    var Next := FNodeArray.Prev;
-    Dispose(FNodeArray);
-    FNodeArray := Next;
-  end;
+    FNodeArray := FNodeArray.Free;
   { Обрезаем и обнуляем таблицу хэшей со ссылками на элементы }
-  var Length := Length(FNodeArray.Data);
-  SetLength(FLookup, Length);
-  FillChar(FLookup[0], Length * SizeOf(PSCLNode), 0);
+  var NodeCount := Length(FNodeArray.Items);
+  SetLength(FLookup, NodeCount);
+  FillChar(FLookup[0], NodeCount * SizeOf(PSCLNode), 0);
   { Обнуляем первичное хранилище данных }
-  Finalize(FNodeArray.Data[0], Length);
-  FillChar(PByte(FNodeArray.Data)^, Length * SizeOf(FNodeArray.Data[0]), 0);
+  Finalize(FNodeArray.Items[0], NodeCount);
+  FillChar(FNodeArray.Items[0], NodeCount * SizeOf(TSCLNode), 0);
   { Пересоздаём основную таблицу документа }
-  FRootNode := CreateNode(Pointer(Self), ntArray, -1);
+  FRootNode := CreateNode(Pointer(Self), ntArray);
 end;
 
 constructor TSCLDocument.Create(Capacity: Integer);
 begin
   { Выделяем память под элементы и индексы }
   Capacity := NextPowerOfTwo(Capacity, MINIMUM_STORE_ITEMS);
-  FNodeArray := TNodeArray.Create(nil, Capacity);
+  FNodeArray := FNodeArray.Expand(Capacity);
   SetLength(FLookup, Capacity);
   FillChar(FLookup[0], Length(FLookup) * SizeOf(PSCLNode), 0);
   { Создаём основную таблицу документа  }
-  FRootNode := CreateNode(Pointer(Self), ntArray, -1);
+  FRootNode := CreateNode(Pointer(Self), ntArray);
 end;
 
 function TSCLDocument.CreateArray: NativeInt;
 begin
-  Result := NativeInt(@CreateNode(Self, ntReserved, -1).FParent);
+  Result := NativeInt(@CreateNode(Self, ntReserved).FParent);
 end;
 
-function TSCLDocument.CreateNode(AParent: Pointer; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
+function TSCLDocument.CreateNode(AParent: Pointer; AType: TSCLNodeType): PSCLNode;
 begin
   { Проверяем что у нас достаточно свободных элементов }
-  if FNextIndex >= Length(FNodeArray.Data) then
+  if FNextIndex >= Length(FNodeArray.Items) then
   begin
-    FNodeArray := TNodeArray.Create(FNodeArray, Length(FNodeArray.Data));
+    FNodeArray := FNodeArray.Expand(Length(FNodeArray.Items));
     FNextIndex := 0;
   end;
   { Резервируем новый элемент }
-  Result := @FNodeArray.Data[FNextIndex];
+  Result := @FNodeArray.Items[FNextIndex];
   Result.FParent := AParent;
   Result.FType := AType;
   Inc(FNextIndex);
   { Для таблиц и массивов создаём дополнительный элемент }
   if AType in [ntArray, ntTable] then
     Result.FValue := CreateArray;
-  { Для таблиц дополнительно обновляем хэш-таблицу }
-  if LookupIndex >= 0 then
-  begin
-    FLookup[LookupIndex] := Result;
-    Inc(FHashed);
-    if FHashed > Length(FLookup) * 3 shr 2 then
-      GrowAndRehash;
-  end;
 end;
 
 destructor TSCLDocument.Destroy;
@@ -1172,16 +1170,16 @@ procedure TSCLDocument.GrowAndRehash;
 begin
   { Создаём новый массив индексов }
   var Rehashed: TArray<PSCLNode>;
-  var HashSize := Length(FLookup);
+  var Lookups := Length(FLookup);
   {$IFDEF CPU64BITS}
-  if HashSize > Integer.MaxValue div 2 then // недостижимо при компиляции в 32-х битном режиме
+  if Lookups > Integer.MaxValue div 2 then // недостижимо при компиляции в 32-х битном режиме
     raise ESCLError.CreateRes(@sMaxHashSizeExceed);
   {$ENDIF}
-  SetLength(Rehashed, HashSize shl 1);
+  SetLength(Rehashed, Lookups shl 1);
   FillChar(Rehashed[0], Length(Rehashed) * SizeOf(PSCLNode), 0);
   { Перераспределяем элементы из старого массива в новый }
-  var Mask: Cardinal := High(FLookup);
-  for var Index := 0 to Mask do
+  var Mask: Cardinal := High(Rehashed);
+  for var Index := 0 to Lookups - 1 do
   begin
     var Item := FLookup[Index];
     if Item <> nil then
@@ -1196,6 +1194,14 @@ begin
     end;
   end;
   FLookup := Rehashed;
+end;
+
+procedure TSCLDocument.InsertHashed(LookupIndex: Integer; Node: PSCLNode);
+begin
+  FLookup[LookupIndex] := Node;
+  Inc(FHashed);
+  if FHashed >= Length(FLookup) * 3 shr 2 then
+    GrowAndRehash;
 end;
 
 function TSCLDocument.IsEmpty: Boolean;
