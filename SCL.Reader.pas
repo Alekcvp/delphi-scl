@@ -62,6 +62,7 @@ type
   end;
 
   HEncoding = class helper for TEncoding
+    function GetStringFromBuffer(Buffer: PByte; Count: Integer): string; inline;
     class function GuessEncoding(Buffer: PByte; Count: Integer): TEncoding;
   end;
 
@@ -98,7 +99,7 @@ type
     destructor Destroy; override;
      function ParseDocument(const Source: string; Document: TSCLDocument = nil): TSCLDocument; overload;
      function ParseDocument(Document: TSCLDocument; Buffer: PByte; Count: Integer; Encoding: TEncoding = nil): TSCLDocument; overload;
-     function ParseFile(const AFileName: string; Document: TSCLDocument = nil): TSCLDocument; overload;
+     function ParseFile(const AFileName: string; Document: TSCLDocument = nil): TSCLDocument; 
     procedure SetLineBreaks(const LineBreak: string); inline;
     class function ReadFrom(const AFileName: string): TSCLDocument;
   end;
@@ -217,6 +218,15 @@ begin
   Result := True;
 end;
 
+function HEncoding.GetStringFromBuffer(Buffer: PByte; Count: Integer): string;
+type
+  TDefaultGetString = function (const Bytes: array of Byte): string of object;
+  THackedGetString  = function (Data: PByte; High: Integer): string of object;
+begin
+  var GetStringFunc: TDefaultGetString := GetString;
+  Result := THackedGetString(GetStringFunc)(Buffer, Count - 1);
+end;
+
 class function HEncoding.GuessEncoding(Buffer: PByte; Count: Integer): TEncoding;
 const
   UTF8BOM: array [0..2] of Byte = ($EF, $BB, $BF);
@@ -287,23 +297,17 @@ begin
 end;
 
 function TSCLReader.ParseDocument(Document: TSCLDocument; Buffer: PByte; Count: Integer; Encoding: TEncoding): TSCLDocument;
-type
-  TGetString = function (const Bytes: array of Byte): string of object;
-  TGetStringHack = function (Data: PByte; High: Integer): string of object;
-var
-  Encoded: string;
-  HackedGetString: TGetString;
 begin
   var DocumentOwner := Document = nil;
   if DocumentOwner then
     Document := TSCLDocument.Create;
   try
+    var Encoded: string;
     if Encoding = nil then
       Encoding := TEncoding.GuessEncoding(Buffer, Count);
     if Encoding <> TEncoding.Unicode then
     begin
-      HackedGetString := Encoding.GetString;
-      Encoded := TGetStringHack(HackedGetString)(Buffer, Count - 1);
+      Encoded := Encoding.GetStringFromBuffer(Buffer, Count);
       if Encoded.IsEmpty and (Count > 0) then
         raise ESCLParsingException.CreateResFmt(@sDocumentEncodingError, [FFileName, SysErrorMessage(GetLastError)]);
       Buffer := PByte(Encoded);
