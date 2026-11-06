@@ -101,7 +101,6 @@ type
      function ReadTime(Hour: Word): TDateTime;
      function ReadWord(MaxValue, Length: Word): Word;
      function SkipLineBreak(Source: PChar): PChar;
-     function SkipEmptyLines(Source: PChar): Boolean;
     procedure ValidateIndent(var CurrentNode: PSCLNode);
   public
     constructor Create;
@@ -620,7 +619,7 @@ end;
 function TSCLReader.ParseToken(var CurrentNode: PSCLNode; var TokenState: TTokenState): Boolean;
 const
   LW_ARRAY_ITEM = $0020002D; // '- '
-  NestedTable: array [0..35] of Byte = (
+  NestedTable: array [#00..#35] of Byte = (
     $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $01, $00, $00,
     $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $00, $00, $01);
@@ -640,11 +639,11 @@ begin
       Result := (PLongWord(FCursor)^ = LW_ARRAY_ITEM) or (SkipSpaces(ValidateNodeName(FCursor))^ = ':');
       TokenState.IsNested := Result;
     end else
-      TokenState.IsNested := NestedTable[Ord(FCursor^)] <> 0;
+      TokenState.IsNested := NestedTable[FCursor^] <> 0;
   end else
   begin
     TokenState.NodeName := ReadNodeName(True);
-    TokenState.IsNested := (FCursor^ <= #35) and (NestedTable[Ord(FCursor^)] <> 0);
+    TokenState.IsNested := (FCursor^ <= #35) and (NestedTable[FCursor^] <> 0);
   end;
   if not TokenState.IsNested then
     ParseNodeValue(CurrentNode, TokenState.NodeName);
@@ -940,7 +939,7 @@ end;
 function TSCLReader.ReadTextBlock(Source: PChar; EmptyLines: TEmptyLines; TrimEnd: Boolean): string;
 begin
   repeat
-    var Wrap := EmptyLines = elSkipAny;
+    var Wrap := False;
     var From := Source + FIndent.Value;
     { Пропускаем пробелы отступа и находим конец строки }
     while (Source < From) and (Source^ = #32) do Inc(Source);
@@ -951,19 +950,19 @@ begin
     FLineStart := FCursor;
     Inc(FLineIndex);
     Source := SkipLineBreak(Last);
-    { Смотрим на чём мы становились }
-    if (Last > From) and TrimEnd then
-      repeat
-        case (Last - 1)^ of
-          #32: ;
-          '\': if Wrap then Break else Wrap := True;
-          else Break;
-        end;
-        Dec(Last);
-      until False;
+    { Смотрим на чём мы остановились }
+    if TrimEnd then while Last > From do
+    begin
+      case (Last - 1)^ of
+        #32: ;
+        '\': if Wrap then Break else Wrap := True;
+        else Break;
+      end;
+      Dec(Last);
+    end;
     { Добавляем строку в буфер при необходимости }
     FStringBuf.Append(From, Last - From);
-    if not Wrap then
+    if ((Last > From) or (EmptyLines <> elSkipAny)) and not Wrap then
       FStringBuf.AppendLineBreak;
   until False;
   { Обрезаем пустые строки в конце при необходимости }
@@ -1006,23 +1005,6 @@ end;
 procedure TSCLReader.SetLineBreaks(const LineBreak: string);
 begin
   FLineBreak := LineBreak;
-end;
-
-function TSCLReader.SkipEmptyLines(Source: PChar): Boolean;
-begin
-  Result := False;
-  repeat
-    case Source^ of
-      '#': Source := SkipToLineEnd(Source);
-      #10, #13: { проходим дальше };
-      else Break;
-    end;
-    Source := SkipSpaces(SkipLineBreak(Source));
-    FLineStart := FCursor;
-    Inc(FLineIndex);
-    Result := True;
-  until False;
-  FCursor := Source;
 end;
 
 function TSCLReader.SkipLineBreak(Source: PChar): PChar;
