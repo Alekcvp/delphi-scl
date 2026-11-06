@@ -20,74 +20,116 @@ uses
 type
   ESerializeError = class(Exception);
 
-  PValueAttributes = ^TValueAttributes;
-  TValueAttributes = record
+  PSCLParams = ^TSCLParams;
+  TSCLParams = record
     Name: string;
     Comment: string;
     State: SCLStateAttribute.TValueState;
-    HasComment: Boolean;
     InlineMode: Boolean;
     IsTimeZone: Boolean;
     NumberBase: TSCLNumberBase;
     StringType: TSCLStringType;
-    constructor Create(const AName: string; const Attributes: TArray<TCustomAttribute>);
+    constructor Create(const AName: string; const Attrs: TArray<TCustomAttribute>);
   end;
 
   TSCLSerializer = record
   private type
-    TValueReader = procedure (Node: PSCLNode; Data: Pointer; AType: TRttiType);
-    TValueWriter = procedure (ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
-    TTypeReaders = array [System.TTypeKind] of TValueReader;
-    TTypeWriters = array [System.TTypeKind] of TValueWriter;
-  private class var
-    FReaderMap: TTypeReaders;
-    FWriterMap: TTypeWriters;
+    TDataEncoder = procedure (Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
   private
     FRTTIContext: TRttiContext;
-    class procedure InitMappingTables; static;
-    class procedure ReadAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadEnumeration(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadFloat(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadLString(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadSet(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadString(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadUString(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure ReadWString(Node: PSCLNode; Data: Pointer; AType: TRttiType); static;
-    class procedure TypeNotSupported(Node: PSCLNode; Data: Pointer; AType: TRttiType); overload; static;
-    class procedure TypeNotSupported(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); overload; static;
-    class procedure WriteAnsiChar(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteDynamycArray(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteEnumeration(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteFloat(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteInt64(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteInteger(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteLString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteRecord(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteSet(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteStaticArray(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteUString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteWideChar(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteWString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType); static;
+    { Статические методы для чтения значений }
+    class procedure DecodeAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeEnumeration(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeFloat(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeLString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeSet(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeUString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure DecodeWString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    { Статические методы для записи значений }
+    class procedure EncodeAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeEnumeration(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeFloat(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeLString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeSet(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeUString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    class procedure EncodeWString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
+    { Дополнительные вспомогательные методы }
+    class procedure TypeNotSupported(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams); static;
   public
     class operator Initialize(out Instance: TSCLSerializer);
     class operator Finalize(var Instance: TSCLSerializer);
-    class procedure ReadValue(ParentNode: PSCLNode; const Name: string;
-      const Attributes: TArray<TCustomAttribute>; Data: Pointer; AType: TRttiType); static;
-    class procedure WriteValue(ParentNode: PSCLNode; const Name: string;
-      const Attributes: TArray<TCustomAttribute>; Data: Pointer; AType: TRttiType); static;
   public
-    procedure Deserialize<T>(Document: TSCLDocument; out Value: T; const Name: string = string.Empty);
-    procedure Serialize<T>(Document: TSCLDocument; const Value: T; const Name: string = string.Empty); overload;
-     function Serialize<T>(const Value: T; const Name: string = string.Empty): TSCLDocument; overload;
+    procedure Deserialize<T>(RootNode: PSCLNode; out Value: T; const AName: string = string.Empty);
+    procedure Serialize<T>(RootNode: PSCLNode; const Value: T; const AName: string = string.Empty); overload;
+     function Serialize<T>(const Value: T; const AName: string = string.Empty): TSCLDocument; overload;
   end;
 
+const
+  DecoderMap: array [System.TTypeKind] of TSCLSerializer.TDataEncoder = (
+    TSCLSerializer.TypeNotSupported,   // tkUnknown
+    TSCLSerializer.DecodeInteger,      // tkInteger
+    TSCLSerializer.DecodeAnsiChar,     // tkChar
+    TSCLSerializer.DecodeEnumeration,  // tkEnumeration
+    TSCLSerializer.DecodeFloat,        // tkFloat
+    TSCLSerializer.DecodeString,       // tkString
+    TSCLSerializer.DecodeSet,          // tkSet
+    TSCLSerializer.TypeNotSupported,   // tkClass
+    TSCLSerializer.TypeNotSupported,   // tkMethod
+    TSCLSerializer.DecodeWideChar,     // tkWChar
+    TSCLSerializer.DecodeLString,      // tkLString
+    TSCLSerializer.DecodeWString,      // tkWString
+    TSCLSerializer.TypeNotSupported,   // tkVariant
+    TSCLSerializer.DecodeStaticArray,  // tkArray
+    TSCLSerializer.DecodeRecord,       // tkRecord
+    TSCLSerializer.TypeNotSupported,   // tkInterface
+    TSCLSerializer.DecodeInt64,        // tkInt64
+    TSCLSerializer.DecodeDynamycArray, // tkDynArray
+    TSCLSerializer.DecodeUString,      // tkUString
+    TSCLSerializer.TypeNotSupported,   // tkClassRef
+    TSCLSerializer.TypeNotSupported,   // tkPointer
+    TSCLSerializer.TypeNotSupported,   // tkProcedure
+    TSCLSerializer.DecodeRecord        // tkMRecord
+  );
+
+  EncoderMap: array [System.TTypeKind] of TSCLSerializer.TDataEncoder = (
+    TSCLSerializer.TypeNotSupported,   // tkUnknown
+    TSCLSerializer.EncodeInteger,      // tkInteger
+    TSCLSerializer.EncodeAnsiChar,     // tkChar
+    TSCLSerializer.EncodeEnumeration,  // tkEnumeration
+    TSCLSerializer.EncodeFloat,        // tkFloat
+    TSCLSerializer.EncodeString,       // tkString
+    TSCLSerializer.EncodeSet,          // tkSet
+    TSCLSerializer.TypeNotSupported,   // tkClass
+    TSCLSerializer.TypeNotSupported,   // tkMethod
+    TSCLSerializer.EncodeWideChar,     // tkWChar
+    TSCLSerializer.EncodeLString,      // tkLString
+    TSCLSerializer.EncodeWString,      // tkWString
+    TSCLSerializer.TypeNotSupported,   // tkVariant
+    TSCLSerializer.EncodeStaticArray,  // tkArray
+    TSCLSerializer.EncodeRecord,       // tkRecord
+    TSCLSerializer.TypeNotSupported,   // tkInterface
+    TSCLSerializer.EncodeInt64,        // tkInt64
+    TSCLSerializer.EncodeDynamycArray, // tkDynArray
+    TSCLSerializer.EncodeUString,      // tkUString
+    TSCLSerializer.TypeNotSupported,   // tkClassRef
+    TSCLSerializer.TypeNotSupported,   // tkPointer
+    TSCLSerializer.TypeNotSupported,   // tkProcedure
+    TSCLSerializer.EncodeRecord        // tkMRecord
+  );
 
 implementation
 
@@ -108,7 +150,7 @@ type
   end;
 
 const
-  ArrayItemAttributes: TValueAttributes = (
+  DefaultParams: TSCLParams = (
     Name: string.Empty;
     Comment: string.Empty;
     State: vsDefault;
@@ -194,15 +236,15 @@ begin
     Move(Buffer^, PByte(Self)^, Count);
 end;
 
-{ TValueAttributes }
+{ TSCLParams }
 
-constructor TValueAttributes.Create(const AName: string; const Attributes: TArray<TCustomAttribute>);
+constructor TSCLParams.Create(const AName: string; const Attrs: TArray<TCustomAttribute>);
 const
   IgnoreStates: array [Boolean] of SCLStateAttribute.TValueState = (vsDontWrite, vsIgnore);
 begin
-  Self := Default(TValueAttributes);
+  Self := Default(TSCLParams);
   Name := AName;
-  for var Attribute in Attributes do
+  for var Attribute in Attrs do
     if Attribute is SCLNameAttribute then
     begin
       Name := SCLNameAttribute(Attribute).Name;
@@ -211,10 +253,8 @@ begin
     end else if Attribute is SCLBaseAttribute then
       NumberBase := SCLBaseAttribute(Attribute).NumberBase
     else if Attribute is SCLCommentAttribute then
-    begin
-      Comment := SCLCommentAttribute(Attribute).Comment;
-      HasComment := True;
-    end else if Attribute is SCLStateAttribute then
+      Comment := SCLCommentAttribute(Attribute).Comment
+    else if Attribute is SCLStateAttribute then
       State := SCLStateAttribute(Attribute).State
     else if Attribute is SCLStringAttribute then
       StringType := SCLStringAttribute(Attribute).StringType
@@ -226,70 +266,12 @@ end;
 
 { TSCLSerializer }
 
-procedure TSCLSerializer.Deserialize<T>(Document: TSCLDocument; out Value: T; const Name: string);
-begin
-  var TypeInfo := PTypeInfo(TypeInfo(T));
-  if TypeInfo <> nil then
-    if (Name = '') and (TypeInfo.Kind in [tkArray, tkDynArray, tkRecord, tkMRecord]) then
-      FReaderMap[TypeInfo.Kind](Document.Root, @Value, FRTTIContext.GetType(TypeInfo))
-    else
-    ReadValue(Document.Root, Name, nil, @Value, FRTTIContext.GetType(TypeInfo));
-end;
-
-class operator TSCLSerializer.Finalize(var Instance: TSCLSerializer);
-begin
-  Instance.FRTTIContext.Free;
-end;
-
-class operator TSCLSerializer.Initialize(out Instance: TSCLSerializer);
-begin
-  Instance.FRTTIContext := TRttiContext.Create;
-end;
-
-class procedure TSCLSerializer.InitMappingTables;
-begin
-  for var Index := Low(FReaderMap) to High(FReaderMap) do
-    FReaderMap[Index] := TypeNotSupported;
-  FReaderMap[tkInteger]     := ReadInteger;
-  FReaderMap[tkChar]        := ReadAnsiChar;
-  FReaderMap[tkEnumeration] := ReadEnumeration;
-  FReaderMap[tkFloat]       := ReadFloat;
-  FReaderMap[tkString]      := ReadString;
-  FReaderMap[tkSet]         := ReadSet;
-  FReaderMap[tkWChar]       := ReadWideChar;
-  FReaderMap[tkLString]     := ReadLString;
-  FReaderMap[tkWString]     := ReadWString;
-  FReaderMap[tkArray]       := ReadStaticArray;
-  FReaderMap[tkRecord]      := ReadRecord;
-  FReaderMap[tkInt64]       := ReadInt64;
-  FReaderMap[tkDynArray]    := ReadDynamycArray;
-  FReaderMap[tkUString]     := ReadUString;
-  FReaderMap[tkMRecord]     := ReadRecord;
-  for var Index := Low(FWriterMap) to High(FWriterMap) do
-    FWriterMap[Index] := TypeNotSupported;
-  FWriterMap[tkInteger]     := WriteInteger;
-  FWriterMap[tkChar]        := WriteAnsiChar;
-  FWriterMap[tkEnumeration] := WriteEnumeration;
-  FWriterMap[tkFloat]       := WriteFloat;
-  FWriterMap[tkString]      := WriteString;
-  FWriterMap[tkSet]         := WriteSet;
-  FWriterMap[tkWChar]       := WriteWideChar;
-  FWriterMap[tkLString]     := WriteLString;
-  FWriterMap[tkWString]     := WriteWString;
-  FWriterMap[tkArray]       := WriteStaticArray;
-  FWriterMap[tkRecord]      := WriteRecord;
-  FWriterMap[tkInt64]       := WriteInt64;
-  FWriterMap[tkDynArray]    := WriteDynamycArray;
-  FWriterMap[tkUString]     := WriteUString;
-  FWriterMap[tkMRecord]     := WriteRecord;
-end;
-
-class procedure TSCLSerializer.ReadAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PAnsiChar(Data)^ := AnsiChar(GetChar(Node));
 end;
 
-class procedure TSCLSerializer.ReadDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   var ArrayType := AType as TRttiDynamicArrayType;
   var ItemType := ArrayType.ElementType;
@@ -302,10 +284,11 @@ begin
     Move(PByte(Bytes)^, PPointer(Data)^^, Count);
   end else if ItemType.Handle = TypeInfo(WideChar) then
   begin
+    { Массивы символов читаем как строки }
     var Chars := Node.AsString;
     var Count := Length(Chars);
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
-    Move(PByte(Chars)^, PPointer(Data)^^, Count shl 1);
+    Move(PByte(Chars)^, PPointer(Data)^^, Count * SizeOf(Char));
   end else if ItemType.Handle = TypeInfo(AnsiChar) then
   begin
     var Chars := AnsiString(Node.AsString);
@@ -315,61 +298,61 @@ begin
   end else
   begin
     { Обычный динамический массив }
-    var Bytes := ArrayType.ElementSize;
+    var ESize := ArrayType.ElementSize;
     var Count := Node.Count;
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
     var ItemData := PByte(PPointer(Data)^);
     for var Item in Node^ do
     begin
-      FReaderMap[ItemType.Handle.Kind](Item, ItemData, ItemType);
-      Inc(ItemData, Bytes);
+      DecoderMap[ItemType.Handle.Kind](Item, ItemData, ItemType, @DefaultParams);
+      Inc(ItemData, ESize);
     end;
   end;
 end;
 
-class procedure TSCLSerializer.ReadEnumeration(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeEnumeration(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  var TypeInfo := AType.Handle;
-  if TypeInfo = System.TypeInfo(Boolean) then
+  var LTypeInfo := AType.Handle;
+  if LTypeInfo = TypeInfo(Boolean) then
   begin
     PBoolean(Data)^ := Node.AsBoolean;
     Exit;
   end;
   var SearchName := AType.QualifiedName + '.';
-  if GetEnumName(TypeInfo, 0).StartsWith(SearchName) then
+  if GetEnumName(LTypeInfo, AType.AsOrdinal.MinValue).StartsWith(SearchName) then
     SearchName := SearchName + Node.AsString
   else SearchName := Node.AsString;
-  var EnumIndex := EnumItemIndex(SearchName, TypeInfo);
-  case TypeInfo.TypeData.OrdType of
+  var EnumIndex := EnumItemIndex(SearchName, LTypeInfo);
+  case LTypeInfo.TypeData.OrdType of
     otSByte, otUByte: PByte(Data)^ := Byte(EnumIndex);
     otSWord, otUWord: PWord(Data)^ := Word(EnumIndex);
     else PLongWord(Data)^ := LongWord(EnumIndex);
   end;
 end;
 
-class procedure TSCLSerializer.ReadFloat(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeFloat(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  var TypeInfo := AType.Handle;
-  if TypeInfo = System.TypeInfo(TDateTime) then
+  var ATypeInfo := AType.Handle;
+  if ATypeInfo = TypeInfo(TDateTime) then
     PDateTime(Data)^ := Node.AsDateTime
-  else if TypeInfo = System.TypeInfo(Comp) then
+  else if ATypeInfo = TypeInfo(Comp) then
     PInt64(Data)^ := Node.AsInteger
-  else if TypeInfo = System.TypeInfo(Currency) then
-    PCurrency(Data)^ := Currency(Node.AsDouble)
-  else if TypeInfo = System.TypeInfo(Extended) then
+  else if ATypeInfo = TypeInfo(Currency) then
+    PInt64(Data)^ := Node.AsInteger
+  else if ATypeInfo = TypeInfo(Extended) then
     PExtended(Data)^ := Extended(Node.AsDouble)
-  else if TypeInfo = System.TypeInfo(Single) then
+  else if ATypeInfo = TypeInfo(Single) then
     PSingle(Data)^ := Single(Node.AsDouble)
   else
     PDouble(Data)^ := Node.AsDouble;
 end;
 
-class procedure TSCLSerializer.ReadInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PInt64(Data)^ := Node.AsInteger;
 end;
 
-class procedure TSCLSerializer.ReadInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   var OrdinalValue := Int64Rec(Node.AsInteger).Lo;
   case AType.AsOrdinal.OrdType of
@@ -379,19 +362,29 @@ begin
   end;
 end;
 
-class procedure TSCLSerializer.ReadLString(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeLString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PAnsiString(Data)^ := AnsiString(Node.AsString);
 end;
 
-class procedure TSCLSerializer.ReadRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   for var Field in AType.GetFields do
     if Field.FieldType <> nil then
-      ReadValue(Node, Field.Name, Field.GetAttributes, PByte(Data) + Field.Offset, Field.FieldType);
+    begin
+      var LParams := TSCLParams.Create(Field.Name, Field.GetAttributes);
+      if LParams.State <> vsIgnore then
+      begin
+        var ItemNode := Node.Items[LParams.Name];
+        if ItemNode <> nil then
+          DecoderMap[Field.FieldType.TypeKind](ItemNode, PByte(Data) + Field.Offset, Field.FieldType, @LParams)
+        else if LParams.State = vsRequired then
+          raise ESerializeError.CreateResFmt(@sReqrdValueMissing, [LParams.Name]);
+      end;
+    end;
 end;
 
-class procedure TSCLSerializer.ReadSet(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeSet(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   var ItemType := AType.AsSet.ElementType;
   if ItemType.TypeKind = tkEnumeration then
@@ -410,7 +403,7 @@ begin
     SetBit(Data, Item.AsInteger);
 end;
 
-class procedure TSCLSerializer.ReadStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   var ArrayType := AType as TRttiArrayType;
   var ItemType := ArrayType.ElementType;
@@ -444,117 +437,85 @@ begin
       raise ESerializeError.CreateResFmt(@sArraySizeMismatch, [Node.Count, ArrayType.TotalElementCount]);
     for var Item in Node^ do
     begin
-      FReaderMap[ItemType.Handle.Kind](Item, ItemData, ItemType);
+      DecoderMap[ItemType.Handle.Kind](Item, ItemData, ItemType, @DefaultParams);
       Inc(ItemData, ItemSize);
     end;
   end;
 end;
 
-class procedure TSCLSerializer.ReadString(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PShortString(Data)^ := ShortString(Node.AsString);
 end;
 
-class procedure TSCLSerializer.ReadUString(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeUString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PString(Data)^ := Node.AsString;
 end;
 
-class procedure TSCLSerializer.ReadValue(ParentNode: PSCLNode; const Name: string;
-  const Attributes: TArray<TCustomAttribute>; Data: Pointer; AType: TRttiType);
-begin
-  var ValueAttr := TValueAttributes.Create(Name, Attributes);
-  var ValueNode := ParentNode^[ValueAttr.Name];
-  if ValueAttr.State <> vsIgnore then
-    if (ValueNode <> nil) and not (ValueNode.NodeType in [ntEmpty, ntNull]) then
-      FReaderMap[AType.Handle.Kind](ValueNode, Data, AType)
-    else if ValueAttr.State = vsRequired then
-      raise ESerializeError.CreateResFmt(@sReqrdValueMissing, [ValueAttr.Name]);
-end;
-
-class procedure TSCLSerializer.ReadWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PWideChar(Data)^ := GetChar(Node);
 end;
 
-class procedure TSCLSerializer.ReadWString(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.DecodeWString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   PWideString(Data)^ := WideString(Node.AsString);
 end;
 
-procedure TSCLSerializer.Serialize<T>(Document: TSCLDocument; const Value: T; const Name: string);
+procedure TSCLSerializer.Deserialize<T>(RootNode: PSCLNode; out Value: T; const AName: string);
 begin
-  var TypeInfo := PTypeInfo(TypeInfo(T));
-  if TypeInfo <> nil then
-    if (Name = '') and (TypeInfo.Kind in [tkArray, tkDynArray, tkRecord, tkMRecord]) then
-    begin
-      var EmptyAttrs := TValueAttributes.Create(Name, nil);
-      FWriterMap[TypeInfo.Kind](Document.Root, @EmptyAttrs, @Value, FRTTIContext.GetType(TypeInfo))
-    end else
-      WriteValue(Document.Root, Name, nil, @Value, FRTTIContext.GetType(TypeInfo));
-end;
-
-function TSCLSerializer.Serialize<T>(const Value: T; const Name: string): TSCLDocument;
-begin
-  Result := TSCLDocument.Create;
-  try
-    Serialize<T>(Result, Value, Name);
-  except
-    FreeAndNil(Result);
-    raise;
+  var AType := FRTTIContext.GetType(TypeInfo(T));
+  if AType <> nil then
+  begin
+    var Params := TSCLParams.Create(AName, AType.GetAttributes);
+    if Params.Name <> string.Empty then
+      RootNode := RootNode.Items[Params.Name]
+    else if not (AType.TypeKind in [tkDynArray, tkArray, tkRecord, tkMRecord, tkSet]) then
+      { Для простых типов без имени получаем первый элемент массива }
+      RootNode := RootNode.FirstChild;
+    DecoderMap[AType.TypeKind](RootNode, @Value, AType, @Params);
   end;
 end;
 
-class procedure TSCLSerializer.TypeNotSupported(Node: PSCLNode; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  raise ESerializeError.CreateResFmt(@sValueTypeNotSupp, [GetEnumName(TypeInfo(TTypeKind), Ord(AType.TypeKind))]) at ReturnAddress;
+  Node.AsString := string(PAnsiChar(Data)^);
 end;
 
-class procedure TSCLSerializer.TypeNotSupported(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
-begin
-  raise ESerializeError.CreateResFmt(@sValueTypeNotSupp, [GetEnumName(TypeInfo(TTypeKind), Ord(AType.TypeKind))]) at ReturnAddress;
-end;
-
-class procedure TSCLSerializer.WriteAnsiChar(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
-begin
-  ParentNode.AddValue(Attrs.Name, string(PAnsiChar(Data)^));
-end;
-
-class procedure TSCLSerializer.WriteDynamycArray(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   var ArrayType := AType as TRttiDynamicArrayType;
   var ItemType := ArrayType.ElementType;
   var ItemData := PByte(PPointer(Data)^);
   if ItemType.Handle = TypeInfo(Byte) then
     { Массив байт пишем в бинарное значение }
-    ParentNode.AddValue(Attrs.Name, TBytes.Create(ItemData, DynArraySize(ItemData)))
+    Node.AsBytes := TBytes.Create(ItemData, DynArraySize(ItemData))
   else if ItemType.Handle = TypeInfo(WideChar) then
     { Массивы символов пишем в обычную строку }
-    ParentNode.AddValue(Attrs.Name, StringFromCharArray(PWideChar(ItemData), DynArraySize(ItemData)))
+    Node.AsString := StringFromCharArray(PWideChar(ItemData), DynArraySize(ItemData))
   else if ItemType.Handle = TypeInfo(AnsiChar) then
-    ParentNode.AddValue(Attrs.Name, StringFromCharArray(PAnsiChar(ItemData), DynArraySize(ItemData)))
+    Node.AsString := StringFromCharArray(PAnsiChar(ItemData), DynArraySize(ItemData))
   else
   begin
+    Node.MakeParent(False, Params.InlineMode and (Node.Parent <> nil));
     var ItemSize := ArrayType.ElementSize;
-    if Attrs <> nil then
-      ParentNode := ParentNode.AddArray(Attrs.Name, Attrs.InlineMode);
     for var Index := 0 to DynArraySize(ItemData) - 1 do
     begin
-      WriteValue(ParentNode, string.Empty, nil, ItemData, ItemType);
+      EncoderMap[ItemType.TypeKind](Node.AddNode(string.Empty, ntEmpty), ItemData, ItemType, @DefaultParams);
       Inc(ItemData, ItemSize);
     end;
   end;
 end;
 
-class procedure TSCLSerializer.WriteEnumeration(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
-var
-  ValueName: string;
+class procedure TSCLSerializer.EncodeEnumeration(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   if AType.Handle = TypeInfo(Boolean) then
   begin
-    ParentNode.AddValue(Attrs.Name, PBoolean(Data)^);
+    Node.AsBoolean := PBoolean(Data)^;
     Exit;
   end;
+  var ValueName: string;
   case (AType as TRttiOrdinalType).OrdType of
     otSByte: ValueName := GetEnumName(AType.Handle, PShortInt(Data)^);
     otUByte: ValueName := GetEnumName(AType.Handle, PByte(Data)^);
@@ -566,71 +527,78 @@ begin
   var TypeName := string(AType.Name) + '.';
   if ValueName.StartsWith(TypeName) then
     Delete(ValueName, 1, TypeName.Length);
-  ParentNode.AddValue(Attrs.Name, ValueName, stLiteral);
+  Node.SetValue(ValueName, stLiteral);
 end;
 
-class procedure TSCLSerializer.WriteFloat(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeFloat(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  if AType.Handle = TypeInfo(TDateTime) then
+  var ATypeInfo := AType.Handle;
+  if ATypeInfo = TypeInfo(TDateTime) then
   begin
-    var TimeOffset: SmallInt := TIME_OFFSET_LOCAL;
-    if Attrs.IsTimeZone then
-      TimeOffset := Round(TTimeZone.Local.GetUtcOffset(Now).TotalMinutes);
-    ParentNode.AddValue(Attrs.Name, PDateTime(Data)^, TimeOffset);
-  end else if AType.Handle = TypeInfo(Comp) then
-    ParentNode.AddValue(Attrs.Name, PInt64(Data)^)
-  else if AType.Handle = TypeInfo(Currency) then
-    ParentNode.AddValue(Attrs.Name, Double(PCurrency(Data)^))
-  else if AType.Handle = TypeInfo(Extended) then
-    ParentNode.AddValue(Attrs.Name, Double(PExtended(Data)^))
-  else if AType.Handle = TypeInfo(Single) then
-    ParentNode.AddValue(Attrs.Name, Double(PSingle(Data)^))
+    Node.AsDateTime := PDateTime(Data)^;
+    if Params.IsTimeZone then
+      Node.TimeOffset := Round(TTimeZone.Local.GetUtcOffset(Now).TotalMinutes);
+  end else if ATypeInfo = TypeInfo(Comp) then
+    Node.AsInteger := PInt64(Data)^
+  else if ATypeInfo = TypeInfo(Currency) then
+    Node.AsInteger := PInt64(Data)^
+  else if ATypeInfo = TypeInfo(Extended) then
+    Node.AsDouble := Double(PExtended(Data)^)
+  else if ATypeInfo = TypeInfo(Single) then
+    Node.AsDouble := Double(PSingle(Data)^)
   else
-    ParentNode.AddValue(Attrs.Name, PDouble(Data)^);
+    Node.AsDouble := PDouble(Data)^;
 end;
 
-class procedure TSCLSerializer.WriteInt64(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  ParentNode.AddValue(Attrs.Name, PInt64(Data)^, Attrs.NumberBase);
+  Node.SetValue(PInt64(Data)^, Params.NumberBase);
 end;
 
-class procedure TSCLSerializer.WriteInteger(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  var Value: Int64;
+  var Int64Value: Int64;
   case (AType as TRttiOrdinalType).OrdType of
-    otSByte: Value := PShortInt(Data)^;
-    otUByte: Value := PByte(Data)^;
-    otSWord: Value := PSmallInt(Data)^;
-    otUWord: Value := PWord(Data)^;
-    otSLong: Value := PInteger(Data)^
-    else Value := PCardinal(Data)^; // otULong
+    otSByte: Int64Value := PShortInt(Data)^;
+    otUByte: Int64Value := PByte(Data)^;
+    otSWord: Int64Value := PSmallInt(Data)^;
+    otUWord: Int64Value := PWord(Data)^;
+    otSLong: Int64Value := PInteger(Data)^
+    else Int64Value := PCardinal(Data)^; // otULong
   end;
-  ParentNode.AddValue(Attrs.Name, Value, Attrs.NumberBase);
+  Node.SetValue(Int64Value, Params.NumberBase);
 end;
 
-class procedure TSCLSerializer.WriteLString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeLString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  ParentNode.AddValue(Attrs.Name, string(PAnsiString(Data)^), Attrs.StringType);
+  Node.SetValue(string(PAnsiString(Data)^), Params.StringType);
 end;
 
-class procedure TSCLSerializer.WriteRecord(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  if Attrs <> nil then
-    ParentNode := ParentNode.AddTable(Attrs.Name);
   for var Field in AType.GetFields do
     if Field.FieldType <> nil then
-      WriteValue(ParentNode, Field.Name, Field.GetAttributes, PByte(Data) + Field.Offset, Field.FieldType);
+    begin
+      var FldType := Field.FieldType;
+      var LParams := TSCLParams.Create(Field.Name, Field.GetAttributes);
+      if not (LParams.State in [vsDontWrite, vsIgnore]) then
+      begin
+        var ItemNode := Node.AddNode(LParams.Name, ntEmpty);
+        ItemNode.Comment := LParams.Comment;
+        EncoderMap[FldType.TypeKind](ItemNode, PByte(Data) + Field.Offset, FldType, @LParams);
+      end;
+    end;
 end;
 
-class procedure TSCLSerializer.WriteSet(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeSet(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  var ElementType := (AType as TRttiSetType).ElementType;
-  var ValueNode := ParentNode.AddArray(Attrs.Name, True);
-  if ElementType.TypeKind = tkEnumeration then
+  var EType := (AType as TRttiSetType).ElementType;
+  Node.MakeParent(False, (AType.TypeSize = 1) and (Node.Parent <> nil));
+  if EType.TypeKind = tkEnumeration then
   begin
     var ItemName: string;
     var TypeName := string(AType.Name) + '.';
-    var NamesArray := TRttiEnumerationType(ElementType).GetNames;
+    var NamesArray := TRttiEnumerationType(EType).GetNames;
     var StripPrefix := NamesArray[0].StartsWith(TypeName);
     for var Index := 0 to AType.TypeSize * 8 - 1 do
       if IsBitSet(Data, Index) then
@@ -638,77 +606,98 @@ begin
         ItemName := NamesArray[Index];
         if StripPrefix then
           Delete(ItemName, 1, TypeName.Length);
-        ValueNode.AddValue(string.Empty, ItemName, stLiteral);
+        Node.AddValue(string.Empty, ItemName, stLiteral);
       end;
   end else for var Index := 0 to AType.TypeSize * 8 - 1 do
     if IsBitSet(Data, Index) then
-      ValueNode.AddValue(string.Empty, Index);
+      Node.AddValue(string.Empty, Index);
 end;
 
-class procedure TSCLSerializer.WriteStaticArray(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
   var ArrayType := AType as TRttiArrayType;
   var ItemType := ArrayType.ElementType;
   if ItemType.Handle = TypeInfo(Byte) then
     { Массив байт пишем в бинарное значение }
-    ParentNode.AddValue(Attrs.Name, TBytes.Create(Data, ArrayType.TotalElementCount))
+    Node.AsBytes := TBytes.Create(Data, ArrayType.TotalElementCount)
   else if ItemType.Handle = TypeInfo(WideChar) then
     { Массивы символов пишем в обычную строку }
-    ParentNode.AddValue(Attrs.Name, StringFromCharArray(PWideChar(Data), ArrayType.TotalElementCount))
+    Node.AsString := StringFromCharArray(PWideChar(Data), ArrayType.TotalElementCount)
   else if ItemType.Handle = TypeInfo(AnsiChar) then
-    ParentNode.AddValue(Attrs.Name, StringFromCharArray(PAnsiChar(Data), ArrayType.TotalElementCount))
+    Node.AsString := StringFromCharArray(PAnsiChar(Data), ArrayType.TotalElementCount)
   else
   begin
     { Иначе записываем массив поэлементно }
     var ItemSize := ArrayType.TypeSize div ArrayType.TotalElementCount;
     var ItemData := PByte(Data);
-    if Attrs <> nil then
-      ParentNode := ParentNode.AddArray(Attrs.Name, Attrs.InlineMode);
+    Node.MakeParent(False, Params.InlineMode and (Node.Parent <> nil));
     for var Index := 0 to ArrayType.TotalElementCount - 1 do
     begin
-      WriteValue(ParentNode, string.Empty, nil, ItemData, ItemType);
+      EncoderMap[ItemType.TypeKind](Node.AddNode(string.Empty, ntEmpty), ItemData, ItemType, @DefaultParams);
       Inc(ItemData, ItemSize);
     end;
   end;
 end;
 
-class procedure TSCLSerializer.WriteString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  ParentNode.AddValue(Attrs.Name, string(PShortString(Data)^), Attrs.StringType);
+  Node.SetValue(string(PShortString(Data)^), Params.StringType);
 end;
 
-class procedure TSCLSerializer.WriteUString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeUString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  ParentNode.AddValue(Attrs.Name, PString(Data)^, Attrs.StringType);
+  Node.SetValue(PString(Data)^, Params.StringType);
 end;
 
-class procedure TSCLSerializer.WriteValue(ParentNode: PSCLNode; const Name: string;
-  const Attributes: TArray<TCustomAttribute>; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.EncodeWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  var ValueAttributes := TValueAttributes.Create(Name, Attributes);
-  if not (ValueAttributes.State in [vsDontWrite, vsIgnore]) then
+  Node.AsString := string(PWideChar(Data)^);
+end;
+
+class procedure TSCLSerializer.EncodeWString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
+begin
+  Node.SetValue(string(PWideString(Data)^), Params.StringType);
+end;
+
+class operator TSCLSerializer.Finalize(var Instance: TSCLSerializer);
+begin
+  Instance.FRTTIContext.Free;
+end;
+
+class operator TSCLSerializer.Initialize(out Instance: TSCLSerializer);
+begin
+  Instance.FRTTIContext := TRttiContext.Create;
+end;
+
+procedure TSCLSerializer.Serialize<T>(RootNode: PSCLNode; const Value: T; const AName: string);
+begin
+  var AType := FRTTIContext.GetType(TypeInfo(T));
+  if AType <> nil then
   begin
-    if ValueAttributes.HasComment then
-    begin
-      var Comments := SplitComment(ValueAttributes.Comment);
-      for var Index := 0 to High(Comments) do
-        ParentNode.AddComment(Comments[Index]);
-    end;
-    FWriterMap[AType.TypeKind](ParentNode, @ValueAttributes, Data, AType);
+    var Params := TSCLParams.Create(AName, AType.GetAttributes);
+    if Params.Name <> string.Empty then
+      RootNode := RootNode.AddNode(Params.Name, ntEmpty)
+    else if not (AType.TypeKind in [tkDynArray, tkArray, tkRecord, tkMRecord, tkSet]) then
+      { Для простых типов без имени мы создаём массив из одного элемента }
+      RootNode := RootNode.AddNode(string.Empty, ntEmpty);
+    EncoderMap[AType.TypeKind](RootNode, @Value, AType, @Params)
   end;
 end;
 
-class procedure TSCLSerializer.WriteWideChar(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+function TSCLSerializer.Serialize<T>(const Value: T; const AName: string): TSCLDocument;
 begin
-  ParentNode.AddValue(Attrs.Name, string(PWideChar(Data)^));
+  Result := TSCLDocument.Create;
+  try
+    Serialize<T>(Result.Root, Value, AName);
+  except
+    FreeAndNil(Result);
+    raise;
+  end;
 end;
 
-class procedure TSCLSerializer.WriteWString(ParentNode: PSCLNode; Attrs: PValueAttributes; Data: Pointer; AType: TRttiType);
+class procedure TSCLSerializer.TypeNotSupported(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  ParentNode.AddValue(Attrs.Name, string(PWideString(Data)^), Attrs.StringType);
+  raise ESerializeError.CreateResFmt(@sValueTypeNotSupp, [GetEnumName(TypeInfo(TTypeKind), Ord(AType.TypeKind))]) at ReturnAddress;
 end;
-
-initialization
-  TSCLSerializer.InitMappingTables;
 
 end.

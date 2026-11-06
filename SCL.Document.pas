@@ -25,7 +25,6 @@ type
     ntReserved,
     ntBinary,
     ntBoolean,
-    ntComment,
     ntDateTime,
     ntFloat,
     ntInteger,
@@ -40,6 +39,7 @@ type
   PSCLNode = ^TSCLNode;
   TSCLNode = record
   private const
+    ParentTypes: array [Boolean] of TSCLNodeType = (ntArray, ntTable);
     ShiftValues: array [TSCLNumberBase] of Byte = (0, 1, 4, 3);
   private type
     PBytes = ^TBytes;
@@ -59,8 +59,9 @@ type
       FLast: PSCLNode;
     end;
   private
-    FName: string;     // имя узла или комментарий
-    FType: TSCLNodeType;
+    FName: string;     // имя узла
+    FComment: string;  // комментарий к узлу
+    FType: TSCLNodeType; // базовый тип узла
     FSubType: Byte;    // расширенный тип для строк и чисел
     FInfo: SmallInt;   // смещение времени для дат или количество элементов для таблиц и массивов
     FParent: PSCLNode; // => TSCLArray.FDocument
@@ -88,7 +89,6 @@ type
      function GetTimeOffset: SmallInt;
      function SCLArray: PSCLArray;
      function TypeName: string; inline;
-    procedure ForceType(RequiredType: TSCLNodeType);
     procedure SetDateTime(const Value: TDateTime); inline;
     procedure SetFloat(const Value: Double); inline;
     procedure SetInteger(const Value: Int64); inline;
@@ -103,14 +103,11 @@ type
     class operator Finalize(var Instance: TSCLNode);
     { Используется для блокирования прямого копирования значений }
     class operator Assign(var Dest: TSCLNode; const [ref] Src: TSCLNode);
-     { Добавляет комментарий к узлу Node (по факту перед ним) }
-     class function AddComment(Node: PSCLNode; const Comment: string): PSCLNode; overload; static;
-     function AddComment(const Comment: string): PSCLNode; overload;
      { Добавляет дочерний узел заданного типа }
      function AddNode(const AName: string; AType: TSCLNodeType): PSCLNode; inline;
      { Добавляет дочернюю таблицу или массив. Пустой массив может быть преобразован в таблицу. }
-     function AddArray(const AName: string; IsInline: Boolean = False): PSCLNode;
-     function AddTable(const AName: string; IsInline: Boolean = False): PSCLNode;
+     function AddArray(const AName: string; AsInline: Boolean = False): PSCLNode;
+     function AddTable(const AName: string; AsInline: Boolean = False): PSCLNode;
      { Добавляют узлы разных типов и присваивают им значения }
      function AddValue(const AName: string; const Value: Boolean): PSCLNode; overload;
      function AddValue(const AName: string; const Value: string; &Type: TSCLStringType = stDefault): PSCLNode; overload;
@@ -118,6 +115,10 @@ type
      function AddValue(const AName: string; const Value: Double; APrecision: TSCLPrecision = 16): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TBytes): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TDateTime; AOffset: SmallInt = 0): PSCLNode; overload;
+     { Преобразует тип узла к заданному. Возвращает True если тип узла был изменён }
+     function ForceType(RequiredType: TSCLNodeType): Boolean;
+    { Преобразует пустой узел в массив или таблицу }
+    procedure MakeParent(AsTable, AsInline: Boolean);
     { Добавляет дерево узлов, игнорируя существующие }
     procedure MergeNodes(Source: PSCLNode);
     { Присваивает узлу значение и дополнительную информацию в один шаг. Устанавливает тип пустых узлов. }
@@ -130,11 +131,11 @@ type
     { Присваивает пустому узлу значение Null }
     procedure SetNullValue; inline;
      function GetEnumerator: TArrayEnumerator; inline;
+     { Возвращает True для строчных массивов и таблиц }
+     function IsInline: Boolean;
      { Признак того, что это первый или последний узел у родителя }
      function IsFirst: Boolean; inline;
      function IsLast: Boolean; inline;
-     { Возвращает True для строчных массивов и таблиц }
-     function IsInline: Boolean; inline;
      { Признак корневого узла документа }
      function IsRoot: Boolean; inline;
      { Возвращает дочерний узел по его пути ('table/array/@<index>') }
@@ -151,8 +152,10 @@ type
      property Count: Integer read GetCount;
      { Возвращает порядковый номер текущего элемента }
      property ItemIndex: Integer read GetItemIndex;
-     { Имя узла или текст комментария }
+     { Имя узла }
      property Name: string read FName;
+     { Комментарий к узлу }
+     property Comment: string read FComment write FComment;
      { Путь к узлу от корневого узла }
      property Path: string read GetPath;
      { Точность числа с плавающей точкой }
@@ -246,7 +249,6 @@ const
     '#Reserved', // do not localize!
     sTypeName_Binary,
     sTypeName_Boolean,
-    '#Comment',  // do not localize!
     sTypeName_DateTime,
     sTypeName_Float,
     sTypeName_Integer,
@@ -260,27 +262,30 @@ implementation
 uses
   System.DateUtils;
 
-{$IF SizeOf(TSCLNode) > 24}{$Message Warn 'Превышен запланированный размер узла SCL в 24 байта!'}{$IFEND}
+const
+  SCL_NODE_SIZE = SizeOf(TSCLNode);
+
+{$IF SCL_NODE_SIZE > 32}{$Message Warn 'Превышен запланированный размер узла SCL в 32 байта!'}{$IFEND}
 
 resourcestring
   sAssignNotAllowed  = 'Не допускается прямое копирование элементов TSCLNode';
-  sConversionFailed  = 'Невозможно преобразовать элемент ''%s'' [%s] к типу ''%s''';
-  sDuplicateItemName = 'Элемент ''%s'' уже существует в таблице ''%s''';
+  sConversionFailed  = 'Невозможно преобразовать элемент %s (%s) к типу ''%s''';
+  sDuplicateItemName = 'Элемент %s уже существует в таблице %s';
   sIllegalNameChars  = 'Недопустимый символ в имени узла: ''%s''';
   sInvalidItemLink   = 'Недопустимая ссылка на узел документа (nil)';
-  sInvalidNodePath   = 'Некорректный путь к узлу: ''%s''';
-  sInvalidValueType  = 'Элемент ''%s'' [%s] должен иметь тип ''%s''';
+  sInvalidNodePath   = 'Некорректный путь к узлу: %s';
+  sInvalidValueType  = 'Элемент %s [%s] должен иметь тип ''%s''';
   sLookupTableIsFull = 'В массиве хэшей нет свободных мест';
   sNestedInlineError = 'Вложенные строчные массивы и таблицы не допускаются';
   sNoArrayNameAllowd = 'Элементы массива не могут иметь ключей';
   sNoCommentInInline = 'Комментарии в строчных массивах и таблицах не допускаются';
-  sNodeIsNotAParent  = 'Элемент ''%s'' [%s] не является массивом или таблицей';
-  sNoParentNodeFound = 'У элемента ''%s'' отсутствует родительский узел';
+  sNodeIsNotAParent  = 'Элемент %s [%s] не является массивом или таблицей';
+  sNoParentNodeFound = 'У элемента %s отсутствует родительский узел';
   sNoRootNodeComment = 'Нельзя добавить комментарий к корневому узлу документа';
   sNoTextBlckAllowed = 'Текстовые блоки не допускаются внутри строчных массивов и таблиц';
+  sReservedTypeError = 'Обнаружен недопустимый тип элемента';
   sTableItemNameRqrd = 'Для элементов таблиц необходимо указать не пустые имена';
-  sTooManyChildItems = 'Достигнут предел дочерних элементов в ''%s''';
-  sUnacceptableType  = 'Недопустимый тип элемента ''%s''';
+  sTooManyChildItems = 'Достигнут предел дочерних элементов в %s';
 
   {$IFDEF CPU64BITS}
   sMaxDocSizeExceed  = 'Превышен максимальный размер SCL-документа';
@@ -289,7 +294,7 @@ resourcestring
 
 const
   FLAG_INLINE = $01; // строчный массив или таблица
-  FLAG_DATA   = $02; // в массиве или таблице есть данные
+//  FLAG_DATA   = $02; // в массиве или таблице есть данные
 
 var
   SCLNameBuilder: TStringBuffer = nil;
@@ -392,30 +397,29 @@ end;
 
 { TSCLNode }
 
-function TSCLNode.AddArray(const AName: string; IsInline: Boolean): PSCLNode;
+function TSCLNode.AddArray(const AName: string; AsInline: Boolean): PSCLNode;
 begin
   Result := AddChild(AName, ntArray);
-  Result.FSubType := Byte(IsInline);
+  Result.FSubType := Byte(AsInline);
 end;
 
 function TSCLNode.AddChild(const AName: string; AType: TSCLNodeType; LookupIndex: Integer): PSCLNode;
-const
-  ParentTypes: array [Boolean] of TSCLNodeType = (ntArray, ntTable);
 begin
   { Нельзя создать узлы следующих типов стандартным способом }
-  if AType in [ntReserved, ntComment] then
-    raise ESCLError.CreateResFmt(@sUnacceptableType, [SCLTypeNames[AType]]);
+  if AType = ntReserved then
+    raise ESCLError.CreateRes(@sReservedTypeError);
   var PNodeName := PPChar(@AName)^;
   case FType of
-    ntArray:
-      if PNodeName <> nil then
-        { При попытке добавить в пустой массив узел с именем - массив становится таблицей }
-        if FSubType and FLAG_DATA = 0 then
-        begin
-          FType := ntTable;
+    ntEmpty:
+      begin
+        ForceType(ParentTypes[PNodeName <> nil]);
+        if FType = ntTable then
           { Необходимо узнать индекс нового элемента в хэш-таблице }
           PSCLArray(FValue).FDocument.Find(@Self, AName, LookupIndex);
-        end else raise ESCLError.CreateResFmt(@sNoArrayNameAllowd, [AName, GetPath]);
+      end;
+    ntArray:
+      if PNodeName <> nil then
+        raise ESCLError.CreateResFmt(@sNoArrayNameAllowd, [AName, GetPath]);
     ntTable:
       if PNodeName = nil then
         raise ESCLError.CreateResFmt(@sTableItemNameRqrd, [AName, GetPath])
@@ -445,49 +449,6 @@ begin
       FDocument.InsertHashed(LookupIndex, Result);
   end;
   Inc(FInfo);
-  if (FSubType and FLAG_DATA = 0) and (AType <> ntComment) then
-    FSubType := FSubType or FLAG_DATA;
-end;
-
-class function TSCLNode.AddComment(Node: PSCLNode; const Comment: string): PSCLNode;
-begin
-  if Node = nil then
-    raise ESCLError.CreateRes(@sInvalidItemLink);
-  if Node.FParent = nil then
-    raise ESCLError.CreateRes(@sNoRootNodeComment);
-  if Node.FParent.FSubType and FLAG_INLINE <> 0 then
-    raise Exception.CreateRes(@sNoCommentInInline);
-  with TSCLNode.PSCLArray(Node.FParent.FValue)^ do
-  begin
-    Result := FDocument.CreateNode(Node.FParent, ntComment);
-    Result.FName := Comment;
-    Result.FNext := Node;
-    var PrevNode := Node.PrevSibling;
-    if PrevNode = nil then
-      FFirst := Result
-    else
-      PrevNode.FNext := Result;
-  end;
-  Inc(Node.FParent.FInfo);
-end;
-
-function TSCLNode.AddComment(const Comment: string): PSCLNode;
-begin
-  if not (FType in [ntArray, ntTable]) then
-    raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [FName, TypeName]);
-  if FSubType and FLAG_INLINE <> 0 then
-    raise Exception.CreateRes(@sNoCommentInInline);
-  with PSCLArray(FValue)^ do
-  begin
-    Result := FDocument.CreateNode(@Self, ntComment);
-    Result.FName := Comment;
-    if FFirst = nil then
-      FFirst := Result;
-    if FLast <> nil then
-      FLast.FNext := Result;
-    FLast := Result;
-  end;
-  Inc(FInfo);
 end;
 
 function TSCLNode.AddNode(const AName: string; AType: TSCLNodeType): PSCLNode;
@@ -495,10 +456,10 @@ begin
   Result := AddChild(AName, AType);
 end;
 
-function TSCLNode.AddTable(const AName: string; IsInline: Boolean): PSCLNode;
+function TSCLNode.AddTable(const AName: string; AsInline: Boolean): PSCLNode;
 begin
   Result := AddChild(AName, ntTable);
-  Result.FSubType := Byte(IsInline);
+  Result.FSubType := Byte(AsInline);
 end;
 
 function TSCLNode.AddValue(const AName, Value: string; &Type: TSCLStringType): PSCLNode;
@@ -530,6 +491,14 @@ begin
   Result := AddChild(AName, ntDateTime);
   Result.FInfo := AOffset;
   PDateTime(@Result.FValue)^ := Value;
+end;
+
+procedure TSCLNode.MakeParent(AsTable, AsInline: Boolean);
+const
+  Flags: array [Boolean] of Byte = (0, FLAG_INLINE);
+begin
+  ForceType(ParentTypes[AsTable]);
+  FSubType := FSubType and not FLAG_INLINE or Flags[AsInline];
 end;
 
 procedure TSCLNode.MergeNodes(Source: PSCLNode);
@@ -599,16 +568,18 @@ begin
   end;
 end;
 
-procedure TSCLNode.ForceType(RequiredType: TSCLNodeType);
+function TSCLNode.ForceType(RequiredType: TSCLNodeType): Boolean;
 begin
-  if FType <> RequiredType then
+  Result := FType <> RequiredType;
+  if Result then
   begin
-    { Нельзя таким образом сделать массив или таблицу }
-    if RequiredType in [ntArray, ntTable] then
-      raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [FName, TypeName]);
     { Изменить тип можно только у новых узлов }
     if FType <> ntEmpty then
       raise ESCLError.CreateResFmt(@sInvalidValueType, [FName, TypeName, SCLTypeNames[RequiredType]]);
+    { Для массивов и таблиц необходимо создать служебный элемент }
+    if (RequiredType in [ntArray, ntTable]) and (FParent <> nil) then
+      FValue := PSCLArray(FParent.FValue).FDocument.CreateArray;
+    { Меняем тип элемента на требуемый }
     FType := RequiredType;
   end;
 end;
@@ -716,7 +687,7 @@ function TSCLNode.GetPath: string;
 var
   NodeStack: TArray<PSCLNode>;
 begin
-  if (FType in [ntComment, ntReserved]) then Exit('');
+  if FType = ntReserved then Exit('');
   if SCLNameBuilder = nil then
     SCLNameBuilder := TStringBuffer.Create;
   SCLNameBuilder.Reset.Append('/');
@@ -782,9 +753,8 @@ begin
 end;
 
 function TSCLNode.IsInline: Boolean;
-const
-  FLAG_INLINE = FLAG_INLINE; // для inline
 begin
+  const FLAG_INLINE = FLAG_INLINE; // для inline
   Result := (FType in [ntArray, ntTable]) and (FSubType and FLAG_INLINE <> 0);
 end;
 
@@ -860,7 +830,8 @@ end;
 
 procedure TSCLNode.SetDateTime(const Value: TDateTime);
 begin
-  ForceType(ntDateTime);
+  if ForceType(ntDateTime) then
+    FInfo := TIME_OFFSET_LOCAL;
   PDateTime(@FValue)^ := Value;
 end;
 
@@ -1026,7 +997,6 @@ begin
     ntReserved:  Result := '#ERROR';
     ntBinary:    Result := BinToHex(PBytes(@FValue)^);
     ntBoolean:   Result := BoolStrings[Boolean(FValue)];
-    ntComment:   Result := FName;
     ntDateTime:  Result := DateTimeAsString;
     ntFloat:     Result := PDouble(@FValue)^.ToString(ffGeneral, FSubType, 0, SCLFormatSettings).ToLower;
     ntInteger:   if FSubType = 0 then
@@ -1047,7 +1017,7 @@ end;
 
 procedure TSCLNode.TypeCheckParent;
 begin
-  if not (FType in [ntArray, ntTable]) then
+  if not (FType in [ntEmpty, ntArray, ntTable]) then
     raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [FName, TypeName]);
 end;
 
@@ -1074,10 +1044,9 @@ end;
 
 function TSCLDocument.TNodeArray.Free: PNodeArray;
 begin
-  var pSelf := PNodeArray(@Self);
-  if pSelf = nil then Exit(nil);
-  Result := pSelf.Prev;
-  Dispose(pSelf);
+  if @Self = nil then Exit(nil);
+  Result := Prev;
+  Dispose(PNodeArray(@Self));
 end;
 
 { TSCLDocument }
@@ -1100,7 +1069,8 @@ begin
   Finalize(FNodeArray.Items[0], NodeCount);
   FillChar(FNodeArray.Items[0], NodeCount * SizeOf(TSCLNode), 0);
   { Пересоздаём основную таблицу документа }
-  FRootNode := CreateNode(Pointer(Self), ntArray);
+  FRootNode := CreateNode(nil, ntEmpty);
+  FRootNode.FValue := CreateArray;
 end;
 
 constructor TSCLDocument.Create(Capacity: Integer);
@@ -1111,7 +1081,8 @@ begin
   SetLength(FLookup, Capacity);
   FillChar(FLookup[0], Length(FLookup) * SizeOf(PSCLNode), 0);
   { Создаём основную таблицу документа  }
-  FRootNode := CreateNode(Pointer(Self), ntArray);
+  FRootNode := CreateNode(nil, ntEmpty);
+  FRootNode.FValue := CreateArray;
 end;
 
 function TSCLDocument.CreateArray: NativeInt;
@@ -1139,11 +1110,9 @@ end;
 
 destructor TSCLDocument.Destroy;
 begin
-  repeat
-    var NextArray := FNodeArray.Prev;
-    Dispose(FNodeArray);
-    FNodeArray := NextArray;
-  until FNodeArray = nil;
+  var NextArray := AtomicExchange(FNodeArray, nil);
+  while NextArray <> nil do
+    NextArray := NextArray.Free;
 end;
 
 function TSCLDocument.Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
@@ -1206,8 +1175,7 @@ end;
 
 function TSCLDocument.IsEmpty: Boolean;
 begin
-  { При создании нового документа корневой узел по умолчанию ntArray }
-  Result := (FRootNode.FType = ntArray) and (FRootNode.FInfo = 0) and (FNodeArray.Prev = nil) and (FNextIndex = 2);
+  Result := (FRootNode.FType = ntEmpty) and (FRootNode.FInfo = 0) and (FNodeArray.Prev = nil) and (FNextIndex = 2);
 end;
 
 procedure TSCLDocument.Merge(Source: TSCLDocument);

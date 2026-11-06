@@ -67,6 +67,11 @@ type
   end;
 
   TSCLReader = class
+  private type
+    TTokenState = record
+      NodeName: string;
+      IsNested: Boolean;
+    end;
   private
     FFileName: string;          // имя исходного файла с документом
     FCursor: PChar;             // текущее положение в документе
@@ -79,10 +84,10 @@ type
   protected
      function ReadSourceFromFile(const AFileName: string): TBytes;
     procedure ParseInlineValue(ParentNode: PSCLNode);
-     function ParseArrayItem(var ParentNode: PSCLNode): Boolean;
-    procedure ParseNodeValue(var ParentNode: PSCLNode; const Name: string);
+    procedure ParseNodeValue(var ParentNode: PSCLNode; const NodeName: string = string.Empty);
     procedure ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Integer = 1);
     procedure ParseStructure(Document: TSCLDocument; Source: PChar; Count: Integer);
+     function ParseToken(var CurrentNode: PSCLNode; var TokenState: TTokenState): Boolean;
     procedure RaiseParsingError(Error: TSCLParsingError; TokenPos: PChar = nil);
      function ReadBaseTwo(Source: PChar; Shift: Integer): Int64;
      function ReadBinary: TBytes;
@@ -93,6 +98,7 @@ type
      function ReadTime(Hour: Word): TDateTime;
      function ReadWord(MaxValue, Length: Word): Word;
      function SkipLineBreak(Source: PChar): PChar;
+     function SkipEmptyLines(Source: PChar): Boolean;
     procedure ValidateIndent(var CurrentNode: PSCLNode);
   public
     constructor Create;
@@ -327,31 +333,6 @@ begin
   Result := ParseDocument(Document, PByte(Source), Source.Length, TEncoding.Unicode);
 end;
 
-function TSCLReader.ParseArrayItem(var ParentNode: PSCLNode): Boolean;
-const
-  NestedTypes: array [Boolean] of TSCLNodeType = (ntTable, ntArray);
-  LW_ARRAY_ITEM = $0020002D;
-begin
-  { Проверяем отступ текущего элемента }
-  ValidateIndent(ParentNode);
-  case FCursor[1] of
-    #10, #13, '#', #32: ;
-    else RaiseParsingError(peIllegalCharacter);
-  end;
-  FCursor := SkipSpaces(FCursor + 1);
-  { Проверяем на вложенный массив или таблицу }
-  var IsNestedArray := PLongWord(FCursor)^ = LW_ARRAY_ITEM;
-  if IsNestedArray or (SkipSpaces(ValidateNodeName(FCursor))^ = ':') then
-  begin
-    ParentNode := ParentNode.AddNode(string.Empty, NestedTypes[IsNestedArray]);
-    Exit(False);
-  end;
-  { Читаем значение элемента }
-  ParseNodeValue(ParentNode, string.Empty);
-  { Мы завершили чтение строки, можно идти дальше }
-  Result := True;
-end;
-
 function TSCLReader.ParseFile(const AFileName: string; Document: TSCLDocument): TSCLDocument;
 begin
   FFileName := ExtractFileName(AFileName);
@@ -370,18 +351,17 @@ begin
   { Параметры для чтения строчного контейнера }
   var ReadNames := FInlineEnd = '}';
   var Delimeter := ValueDelims[ReadNames];
-  var ValueName := string.Empty;
   { Проверяем на завершающую скобку }
   FCursor := SkipSpaces(FCursor + 1);
   if FCursor^ <> FInlineEnd then
   repeat
-    { Для таблиц читаем имя узла }
-    if ReadNames and (FCursor^ <> '#') then
-      ValueName := ReadNodeName(True);
     { Дальше читаем данные }
     if FCursor^ = '#' then
-      RaiseParsingError(peCommentNotAllowedHere);
-    ParseNodeValue(ParentNode, ValueName);
+      RaiseParsingError(peCommentNotAllowedHere, FCursor);
+    if ReadNames then
+      ParseNodeValue(ParentNode, ReadNodeName(True))
+    else
+      ParseNodeValue(ParentNode);
     { Требуется разделитель или завершающая скобка }
     if FCursor^ <> Delimeter then Break;
     { Пропускаем разделитель элементов }
@@ -397,64 +377,62 @@ begin
   Inc(FCursor); // пропускаем ']' / '}'
 end;
 
-procedure TSCLReader.ParseNodeValue(var ParentNode: PSCLNode; const Name: string);
+procedure TSCLReader.ParseNodeValue(var ParentNode: PSCLNode; const NodeName: string);
 
   procedure ValidateValue(Token: PChar; Value: Boolean); overload;
   begin
     if SameToken(FCursor, Token) then
-      ParentNode.AddValue(Name, Value)
+      ParentNode.AddValue(NodeName, Value)
     else RaiseParsingError(peUnknownIdentifier);
   end;
 
   procedure ValidateValue(Token: PChar; Value: Double); overload;
   begin
     if SameToken(FCursor, Token) then
-      ParentNode.AddValue(Name, Value)
+      ParentNode.AddValue(NodeName, Value)
     else RaiseParsingError(peUnknownIdentifier);
   end;
 
 const
   ParsingErrors: array [Boolean] of TSCLParsingError = (peUnknownIdentifier, peIllegalCharacter);
 begin
-  var NextChar := FCursor^;
-  case NextChar of
-    #10, #13, '#': ParentNode := ParentNode.AddArray(Name, False); // у нас новый дочерний узел
+  case FCursor^ of
     '0': case FCursor[1] of
-           'b': ParentNode.AddValue(Name, ReadBaseTwo(FCursor + 2, 1), nbBin);
-           'o': ParentNode.AddValue(Name, ReadBaseTwo(FCursor + 2, 3), nbOct);
-           'x': ParentNode.AddValue(Name, ReadBaseTwo(FCursor + 2, 4), nbHex);
-           else ParseNumberOrDate(ParentNode.AddNode(Name, ntEmpty), FCursor);
+           'b': ParentNode.AddValue(NodeName, ReadBaseTwo(FCursor + 2, 1), nbBin);
+           'o': ParentNode.AddValue(NodeName, ReadBaseTwo(FCursor + 2, 3), nbOct);
+           'x': ParentNode.AddValue(NodeName, ReadBaseTwo(FCursor + 2, 4), nbHex);
+           else ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor);
          end;
-    '1'..'9': ParseNumberOrDate(ParentNode.AddNode(Name, ntEmpty), FCursor);
+    '1'..'9': ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor);
     '+': case Char(Word(FCursor[1]) or $20) of
            'i': ValidateValue('??nf', Double.PositiveInfinity);
            'n': ValidateValue('??an', Double.NaN);
-           else ParseNumberOrDate(ParentNode.AddNode(Name, ntEmpty), FCursor + 1);
+           else ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor + 1);
          end;
     '-': case Char(Word(FCursor[1]) or $20) of
            'i': ValidateValue('??nf', Double.NegativeInfinity);
            'n': ValidateValue('??an', Double.NaN);
-           else ParseNumberOrDate(ParentNode.AddNode(Name, ntEmpty), FCursor + 1, -1);
+           else ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor + 1, -1);
          end;
-    #34: ParentNode.AddValue(Name, ReadString, stDefault);
-    #39: ParentNode.AddValue(Name, ReadString, stLiteral);
-    '%': ParentNode.AddValue(Name, ReadBinary);
-    '[': ParseInlineValue(ParentNode.AddArray(Name, True));
-    '{': ParseInlineValue(ParentNode.AddTable(Name, True));
+    #34: ParentNode.AddValue(NodeName, ReadString, stDefault);
+    #39: ParentNode.AddValue(NodeName, ReadString, stLiteral);
+    '%': ParentNode.AddValue(NodeName, ReadBinary);
+    '[': ParseInlineValue(ParentNode.AddArray(NodeName, True));
+    '{': ParseInlineValue(ParentNode.AddTable(NodeName, True));
     '~': begin
-           ParentNode.AddNode(Name, ntNull);
+           ParentNode.AddNode(NodeName, ntNull);
            Inc(FCursor);
          end;
-    '|': ParentNode.AddValue(Name, ReadText(FStringBuf.LineBreak), stText);
-    '>': ParentNode.AddValue(Name, ReadText(#32), stWrapped);
+    '|': ParentNode.AddValue(NodeName, ReadText(FStringBuf.LineBreak), stText);
+    '>': ParentNode.AddValue(NodeName, ReadText(#32), stWrapped);
   else
     { Специальные значения без учёта регистра }
-    case Char(Word(NextChar) or $20) of
+    case Char(Word(FCursor^) or $20) of
       'f': ValidateValue('?alse', False);
       'i': ValidateValue('?nf', Double.PositiveInfinity);
       'n': if FCursor[1] = 'o' then
            begin
-             ParentNode.AddValue(Name, False);
+             ParentNode.AddValue(NodeName, False);
              Inc(FCursor, 2);
            end else ValidateValue('?an', Double.NaN);
       't': ValidateValue('?rue', True);
@@ -605,8 +583,8 @@ begin
   FCursor := Source;
   FDocEnd := Source + Count;
   { Пропускаем BOM при его наличии }
-  if FCursor^ = #$FEFF then 
-    Inc(FCursor); 
+  if FCursor^ = #$FEFF then
+    Inc(FCursor);
   FLineStart := FCursor;
   { Парсим содержимое документа }
   if FCursor < FDocEnd then
@@ -614,17 +592,14 @@ begin
     FIndent.Reset;
     FInlineEnd := #32; // не #0 чтобы не конфликтовало с концом файла
     var CurrentNode := Document.Root;
+    var TokenState := Default(TTokenState);
     repeat
       case NextToken(FCursor) of
-        #00, #13, #10: { Пропускаем };
-        '#': FCursor := SkipToLineEnd(FCursor);
-        '-': if not ParseArrayItem(CurrentNode) then Continue; // чтение строки не завершено
-      else
-        { Проверяем отступ текущего элемента }
-        ValidateIndent(CurrentNode);
-        ParseNodeValue(CurrentNode, ReadNodeName(True));
+        '#': FCursor := SkipToLineEnd(FCursor + 1);
+        #00, #10, #13: { пропускаем };
+        else if ParseToken(CurrentNode, TokenState) then Continue;
       end;
-      { Пытаемся перейти на новую строку }
+      { Переходим к следующей строке }
       FCursor := SkipLineBreak(FCursor);
       FLineStart := FCursor;
       Inc(FLineIndex);
@@ -635,6 +610,39 @@ begin
         FFileName, E.Message, FLineIndex + 1, FCursor - FLineStart + 1, peInternalSCLError) at ExceptAddr();
   end;
   FFileName := '';
+end;
+
+function TSCLReader.ParseToken(var CurrentNode: PSCLNode; var TokenState: TTokenState): Boolean;
+const
+  LW_ARRAY_ITEM = $0020002D; // '- '
+  NestedTable: array [0..35] of Byte = (
+    $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $00, $01, $00, $00,
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
+    $00, $00, $00, $01);
+  NestedTypes: array [Boolean] of TSCLNodeType = (ntTable, ntArray);
+begin
+  Result := False;
+  var IsArrayItem := PLongWord(FCursor)^ = LW_ARRAY_ITEM;
+  if TokenState.IsNested then
+    CurrentNode := CurrentNode.AddNode(TokenState.NodeName, NestedTypes[IsArrayItem]);
+  ValidateIndent(CurrentNode);
+  if IsArrayItem then
+  begin
+    FCursor := SkipSpaces(FCursor + 2);
+    TokenState.NodeName := string.Empty;
+    if FCursor^ > #35 then
+    begin
+      Result := (PLongWord(FCursor)^ = LW_ARRAY_ITEM) or (SkipSpaces(ValidateNodeName(FCursor))^ = ':');
+      TokenState.IsNested := Result;
+    end else
+      TokenState.IsNested := NestedTable[Ord(FCursor^)] <> 0;
+  end else
+  begin
+    TokenState.NodeName := ReadNodeName(True);
+    TokenState.IsNested := (FCursor^ <= #35) and (NestedTable[Ord(FCursor^)] <> 0);
+  end;
+  if not TokenState.IsNested then
+    ParseNodeValue(CurrentNode, TokenState.NodeName);
 end;
 
 procedure TSCLReader.RaiseParsingError(Error: TSCLParsingError; TokenPos: PChar);
@@ -842,7 +850,7 @@ function TSCLReader.ReadString: string;
       'U': Source := AppendCharByCode(Source, 6);
       else RaiseParsingError(peIllegalEscapeSequence, Source - 1);
     end;
-    Result := Source + 1;
+    Result := Source;
   end;
 
 begin
@@ -868,7 +876,8 @@ begin
           begin
             { Найден экранированный символ }
             FStringBuf.Append(Source, Cursor - Source);
-            Source := AppendSpecialCharacter(Cursor);
+            Cursor := AppendSpecialCharacter(Cursor);
+            Source := Cursor + 1;
           end;
         STR_BREAK: RaiseParsingError(peUnterminatedString, Source);
       else
@@ -989,6 +998,23 @@ end;
 procedure TSCLReader.SetLineBreaks(const LineBreak: string);
 begin
   FStringBuf.LineBreak := LineBreak;
+end;
+
+function TSCLReader.SkipEmptyLines(Source: PChar): Boolean;
+begin
+  Result := False;
+  repeat
+    case Source^ of
+      '#': Source := SkipToLineEnd(Source);
+      #10, #13: { проходим дальше };
+      else Break;
+    end;
+    Source := SkipSpaces(SkipLineBreak(Source));
+    FLineStart := FCursor;
+    Inc(FLineIndex);
+    Result := True;
+  until False;
+  FCursor := Source;
 end;
 
 function TSCLReader.SkipLineBreak(Source: PChar): PChar;

@@ -36,6 +36,7 @@ type
     procedure SetIndentStep(const Value: Integer);
     procedure SetWrapWidth(const Value: Integer);
   protected
+    procedure WriteComment(const Value: string);
     procedure WriteEscapedString(const Value, Suffix: string);
     procedure WriteLiteralString(const Value, Suffix: string);
     procedure WriteNode(Node: PSCLNode; const Suffix: string);
@@ -171,6 +172,13 @@ begin
   Result := FTextBuffer.GetString;
 end;
 
+procedure TSCLWriter.WriteComment(const Value: string);
+begin
+  var Comments := Value.Split([#13#10]);
+  for var Comment in Comments do
+    FTextBuffer.Append('# ').Append(Comment).AppendLineBreak.Indent(FIndent.Value);
+end;
+
 procedure TSCLWriter.WriteDocument(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding);
 begin
   var Buffer := Encoding.GetBytes(WriteDocument(Document));
@@ -256,14 +264,10 @@ end;
 
 procedure TSCLWriter.WriteNode(Node: PSCLNode; const Suffix: string);
 begin
-  if Node.NodeType = ntComment then
-  begin
-    if Node.Name <> '' then
-      FTextBuffer.Append('# ').Append(Node.Name);
-    FTextBuffer.AppendLineBreak;
-    Exit;
-  end;
+  { TODO: Сделать запись комментария узла, в т.ч. многострочного }
   var ParentNode := Node.Parent;
+  if (Node.Comment <> string.Empty) and (ParentNode <> nil) and not ParentNode.IsInline then
+    WriteComment(Node.Comment);
   var SpacedNode := FSpaceNodes and not Node.IsInline and not Node.IsFirst;
   case ParentNode.NodeType of
     ntArray:
