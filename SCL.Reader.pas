@@ -17,7 +17,7 @@ interface
 {$Q-} // переполнение не баг, а полезная фича
 
 uses
-  {$IFDEF MSWINDOWS} Winapi.Windows, {$ENDIF} System.SysUtils, SCL.Common, SCL.Document;
+  {$IFDEF MSWINDOWS} Winapi.Windows, {$ENDIF} System.SysUtils, System.Types, SCL.Common, SCL.Document;
 
 type
   TSCLParsingError = (
@@ -68,6 +68,7 @@ type
 
   TSCLReader = class
   private type
+    TEmptyLines = (elSkipNone, elSkipLast, elSkipAny);
     TTokenState = record
       NodeName: string;
       IsNested: Boolean;
@@ -78,6 +79,7 @@ type
     FDocEnd: PChar;             // конец текста (завершающий #0)
     FIndent: TIndentStack;      // стек с отступами уровней
     FInlineEnd: Char;           // символ завершения строчного массива или таблицы
+    FLineBreak: string;         // перевод строки по умолчанию
     FLineIndex: Integer;        // индекс текущей строки (с 0)
     FLineStart: PChar;          // начало текущей строки
     FStringBuf: TStringBuffer;  // буфер для чтения строк и текста
@@ -94,7 +96,8 @@ type
      function ReadDateTime(Year: Word; var TimeOffset: SmallInt): TDateTime;
      function ReadNodeName(IsRequired: Boolean): string;
      function ReadString: string;
-     function ReadText(const LineBreak: string): string;
+     function ReadText(IsWrappedString: Boolean): string;
+     function ReadTextBlock(Source: PChar; EmptyLines: TEmptyLines; TrimEnd: Boolean): string;
      function ReadTime(Hour: Word): TDateTime;
      function ReadWord(MaxValue, Length: Word): Word;
      function SkipLineBreak(Source: PChar): PChar;
@@ -105,7 +108,7 @@ type
     destructor Destroy; override;
      function ParseDocument(const Source: string; Document: TSCLDocument = nil): TSCLDocument; overload;
      function ParseDocument(Document: TSCLDocument; Buffer: PByte; Count: Integer; Encoding: TEncoding = nil): TSCLDocument; overload;
-     function ParseFile(const AFileName: string; Document: TSCLDocument = nil): TSCLDocument; 
+     function ParseFile(const AFileName: string; Document: TSCLDocument = nil): TSCLDocument;
     procedure SetLineBreaks(const LineBreak: string); inline;
     class function ReadFrom(const AFileName: string): TSCLDocument;
   end;
@@ -295,6 +298,7 @@ begin
     end;
   end;
   FStringBuf := TStringBuffer.Create;
+  FLineBreak := FStringBuf.LineBreak;
 end;
 
 destructor TSCLReader.Destroy;
@@ -423,8 +427,8 @@ begin
            ParentNode.AddNode(NodeName, ntNull);
            Inc(FCursor);
          end;
-    '|': ParentNode.AddValue(NodeName, ReadText(FStringBuf.LineBreak), stText);
-    '>': ParentNode.AddValue(NodeName, ReadText(#32), stWrapped);
+    '|': ParentNode.AddValue(NodeName, ReadText(False), stText);
+    '>': ParentNode.AddValue(NodeName, ReadText(True), stWrapped);
   else
     { Специальные значения без учёта регистра }
     case Char(Word(FCursor^) or $20) of
@@ -590,6 +594,7 @@ begin
   if FCursor < FDocEnd then
   try
     FIndent.Reset;
+    FStringBuf.LineBreak := FLineBreak;
     FInlineEnd := #32; // не #0 чтобы не конфликтовало с концом файла
     var CurrentNode := Document.Root;
     var TokenState := Default(TTokenState);
@@ -855,6 +860,7 @@ function TSCLReader.ReadString: string;
 
 begin
   FStringBuf.Reset;
+  FStringBuf.LineBreak := FLineBreak;
   var Quote := FCursor^;
   var Source := FCursor + 1;
   var Cursor := Source;
@@ -892,75 +898,77 @@ begin
   FCursor := Cursor + 1; // пропускаем кавычки
 end;
 
-function TSCLReader.ReadText(const LineBreak: string): string;
-type
-  TTrimEmptyState = (tesDefault, tesNone, tesAny);
+function TSCLReader.ReadText(IsWrappedString: Boolean): string;
 begin
   if FInlineEnd <> #32 then
     RaiseParsingError(peInlineTextNotAllowed);
-  var IsWrappedString := FCursor^ = '>';
-  Inc(FCursor); // пропускаем '|' / '>'
+  var Source := FCursor + 1; // пропускаем '|' / '>'
   { Пытаемся считать отступ строки [2..8] }
-  var FixedIndent := AsDigit(FCursor^);
-  if Word(FixedIndent - 2) > 6 then
-    FixedIndent := 0
-  else Inc(FCursor);
+  var FixedIndent := Word(AsDigit(Source^) - 2);
+  if FixedIndent <= 6 then
+    Inc(Source);
   { Проверяем режим обрезки пустых строк }
-  var TrimEmptyState := tesDefault;
-  case FCursor^ of
-    '+': begin
-           TrimEmptyState := tesNone;
-           Inc(FCursor);
-         end;
-    '-': begin
-           TrimEmptyState := tesAny;
-           Inc(FCursor);
-         end;
+  var EmptyLines := elSkipLast;
+  case Source^ of
+    '+': EmptyLines := elSkipNone;
+    '-': EmptyLines := elSkipAny;
+    else Dec(Source); // шаг назад для inc()
   end;
+  Inc(Source);
   { Пропускаем комментарий в строке при его наличии }
-  if NextToken(FCursor) = '#' then
-    FCursor := SkipToLineEnd(FCursor);
+  if NextToken(Source) = '#' then
+    Source := SkipToLineEnd(Source);
   { Переходим к содержимому текстового блока }
-  var Source := SkipLineBreak(FCursor);
+  FCursor := Source;
+  Source := SkipLineBreak(Source);
   { Определяем динамический отступ значений }
-  if FixedIndent <> 0 then
-    FIndent.Increment(FixedIndent)
+  if FixedIndent <= 6 then
+    FIndent.Increment(FixedIndent + 2)
   else if not FIndent.SetIndent(SkipSpaces(Source) - Source) then
     Exit(string.Empty); // конец файла или пустой текстовый блок
   { Читаем текстовый блок построчно }
   FStringBuf.Reset;
-  repeat
-    case Source^ of
-      #00: Break;
-      #13, #10:
-        if (TrimEmptyState <> tesAny) and not IsWrappedString then
-          FStringBuf.Append(LineBreak);
-    else
-      { Проверяем количество отступов }
-      var Count := -FIndent.Value;
-      var Start := Source - Count;
-      while (Count < 0) and (Start[Count] = #32) do
-        Inc(Count);
-      if Count <> 0 then Break;
-      { Копируем содержимое строки }
-      Source := SkipToLineEnd(Start);
-      if (Start < Source) or (TrimEmptyState <> tesAny) then
-        if FStringBuf.AppendLine(Start, Source - Start, IsWrappedString) then
-          FStringBuf.Append(LineBreak);
-    end;
-    { Завершаем перевод строки }
-    FCursor := Source;
-    FLineStart := Source;
-    Inc(FLineIndex);
-    { Переходим на новую строку }
-    Source := SkipLineBreak(Source);
-  until False;
+  if IsWrappedString then
+    FStringBuf.LineBreak := #32
+  else
+    FStringBuf.LineBreak := FLineBreak;
+  Result := ReadTextBlock(Source, EmptyLines, IsWrappedString);
   { Уменьшаем оступ для текущего уровня }
   FIndent.Decrement;
+end;
+
+function TSCLReader.ReadTextBlock(Source: PChar; EmptyLines: TEmptyLines; TrimEnd: Boolean): string;
+begin
+  repeat
+    var Wrap := EmptyLines = elSkipAny;
+    var From := Source + FIndent.Value;
+    { Пропускаем пробелы отступа и находим конец строки }
+    while (Source < From) and (Source^ = #32) do Inc(Source);
+    if (Source < From) and (Source^ > #32) then Break; // блок закончился
+    var Last := SkipToLineEnd(Source);
+    { Переводим строку для завершения обработки }
+    FCursor := From - FIndent.Value;
+    FLineStart := FCursor;
+    Inc(FLineIndex);
+    Source := SkipLineBreak(Last);
+    { Смотрим на чём мы становились }
+    if (Last > From) and TrimEnd then
+      repeat
+        case (Last - 1)^ of
+          #32: ;
+          '\': if Wrap then Break else Wrap := True;
+          else Break;
+        end;
+        Dec(Last);
+      until False;
+    { Добавляем строку в буфер при необходимости }
+    FStringBuf.Append(From, Last - From);
+    if not Wrap then
+      FStringBuf.AppendLineBreak;
+  until False;
   { Обрезаем пустые строки в конце при необходимости }
-  if TrimEmptyState <> tesNone then
+  if EmptyLines <> elSkipNone then
     FStringBuf.TrimBreaks;
-  { Возвращаем прочитанную строку удаляя пустые переносы строк в конце }
   Result := FStringBuf.ToString;
 end;
 
@@ -997,7 +1005,7 @@ end;
 
 procedure TSCLReader.SetLineBreaks(const LineBreak: string);
 begin
-  FStringBuf.LineBreak := LineBreak;
+  FLineBreak := LineBreak;
 end;
 
 function TSCLReader.SkipEmptyLines(Source: PChar): Boolean;
