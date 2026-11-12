@@ -19,11 +19,15 @@ interface
 uses
   System.SysUtils, SCL.Common, SCL.Types;
 
+const
+  MAX_BINARY_LENGTH = 64;
+  TIME_OFFSET_LOCAL = -1; // зарезервированное смещение времени для локальных дат
+
 type
   TSCLNodeType = (
     ntEmpty,
     ntReserved,
-    ntBinary,
+    ntBinary,   // максимально MAX_BINARY_LENGTH байт, иначе используйте base64 c stWrapped
     ntBoolean,
     ntDateTime,
     ntFloat,
@@ -59,15 +63,17 @@ type
       FLast: PSCLNode;
     end;
   private
-    FName: string;     // имя узла
-    FComment: string;  // комментарий к узлу
-    FType: TSCLNodeType; // базовый тип узла
-    FSubType: Byte;    // расширенный тип для строк и чисел
-    FInfo: SmallInt;   // смещение времени для дат или количество элементов для таблиц и массивов
-    FParent: PSCLNode; // => TSCLArray.FDocument
-    FNext: PSCLNode;   // => TSCLArray.FFirst
-    FValue: Int64;     // => TSCLArray.FLast
+    FName: string;        // имя узла
+    FComment: string;     // комментарий к узлу
+    FType: TSCLNodeType;  // базовый тип узла
+    FSubType: Byte;       // расширенный тип для строк и чисел
+    FInfo: SmallInt;      // смещение времени для дат или количество элементов для таблиц и массивов
+    FParent: PSCLNode;    // => TSCLArray.FDocument
+    FNext: PSCLNode;      // => TSCLArray.FFirst
+    FPrev: PSCLNode;      // => TSCLArray.FLast
+    FValue: Int64;        // значение узла или ссылка на TSCLArray
      function AddChild(const AName: string; AType: TSCLNodeType; LookupIndex: Integer = -1): PSCLNode;
+     function CountNodesInSubtree: Integer;
      function Exists(const AName: string; out LookupIndex: Integer): Boolean; inline;
      function GetBinary: TBytes; inline;
      function GetBoolean: Boolean; inline;
@@ -83,11 +89,9 @@ type
      function GetOrAddNode(const AName: string; RequiredType: TSCLNodeType): PSCLNode;
      function GetPath: string;
      function GetPrecision: TSCLPrecision;
-     function GetPrev: PSCLNode;
      function GetString: string; inline;
      function GetStringType: TSCLStringType;
      function GetTimeOffset: SmallInt;
-     function SCLArray: PSCLArray;
      function TypeName: string; inline;
     procedure SetDateTime(const Value: TDateTime); inline;
     procedure SetFloat(const Value: Double); inline;
@@ -98,14 +102,14 @@ type
     procedure SetStringType(const Value: TSCLStringType);
     procedure SetTimeOffset(const Value: SmallInt);
     procedure TypeCheck(RequiredType: TSCLNodeType);
-    procedure TypeCheckParent;
+     function TypeCheckParent: Boolean;
   public
     class operator Finalize(var Instance: TSCLNode);
     { Используется для блокирования прямого копирования значений }
     class operator Assign(var Dest: TSCLNode; const [ref] Src: TSCLNode);
      { Добавляет дочерний узел заданного типа }
      function AddNode(const AName: string; AType: TSCLNodeType): PSCLNode; inline;
-     { Добавляет дочернюю таблицу или массив. Пустой массив может быть преобразован в таблицу. }
+     { Добавляет дочернюю таблицу или массив }
      function AddArray(const AName: string; AsInline: Boolean = False): PSCLNode;
      function AddTable(const AName: string; AsInline: Boolean = False): PSCLNode;
      { Добавляют узлы разных типов и присваивают им значения }
@@ -114,23 +118,27 @@ type
      function AddValue(const AName: string; const Value: Int64; Base: TSCLNumberBase = nbDefault): PSCLNode; overload;
      function AddValue(const AName: string; const Value: Double; APrecision: TSCLPrecision = 16): PSCLNode; overload;
      function AddValue(const AName: string; const Value: TBytes): PSCLNode; overload;
-     function AddValue(const AName: string; const Value: TDateTime; AOffset: SmallInt = 0): PSCLNode; overload;
+     function AddValue(const AName: string; const Value: TDateTime; AOffset: SmallInt = TIME_OFFSET_LOCAL): PSCLNode; overload;
      { Преобразует тип узла к заданному. Возвращает True если тип узла был изменён }
      function ForceType(RequiredType: TSCLNodeType): Boolean;
     { Преобразует пустой узел в массив или таблицу }
     procedure MakeParent(AsTable, AsInline: Boolean);
     { Добавляет дерево узлов, игнорируя существующие }
     procedure MergeNodes(Source: PSCLNode);
+    { Удаляет дочерний узел }
+    procedure RemoveNode(Node: PSCLNode);
     { Присваивает узлу значение и дополнительную информацию в один шаг. Устанавливает тип пустых узлов. }
     procedure SetValue(const Value: Boolean); overload;
-    procedure SetValue(const Value: Double; APrecision: TSCLPrecision = 16); overload;
+    procedure SetValue(const Value: Double; APrecision: TSCLPrecision = High(TSCLPrecision)); overload;
     procedure SetValue(const Value: Int64; Base: TSCLNumberBase = nbDefault); overload;
     procedure SetValue(const Value: TBytes); overload;
-    procedure SetValue(const Value: TDateTime; AOffset: SmallInt = 0); overload;
+    procedure SetValue(const Value: TDateTime; AOffset: SmallInt = TIME_OFFSET_LOCAL); overload;
     procedure SetValue(const Value: string; &Type: TSCLStringType = stDefault); overload;
     { Присваивает пустому узлу значение Null }
     procedure SetNullValue; inline;
      function GetEnumerator: TArrayEnumerator; inline;
+     { Возвращает True для пустых узлов (ntEmpty или массив/таблица без элементов) }
+     function IsEmpty: Boolean;
      { Возвращает True для строчных массивов и таблиц }
      function IsInline: Boolean;
      { Признак того, что это первый или последний узел у родителя }
@@ -161,7 +169,7 @@ type
      { Точность числа с плавающей точкой }
      property Precision: TSCLPrecision read GetPrecision write SetPrecision;
      { Предыдущий и следующий узлы в текущем контейнере }
-     property PrevSibling: PSCLNode read GetPrev;
+     property PrevSibling: PSCLNode read FPrev;
      property NextSibling: PSCLNode read FNext;
      { Возвращают первый и последний дочерний узел }
      property FirstChild: PSCLNode read GetFirstChild;
@@ -188,12 +196,12 @@ type
      property S[const AName: string]: PSCLNode index ntString   read GetOrAddNode;
      property T[const AName: string]: PSCLNode index ntTable    read GetOrAddNode;
      { Значения узлов соответствующего типа }
-     property AsBytes: TBytes read GetBinary write SetValue;
-     property AsBoolean: Boolean read GetBoolean write SetValue;
-     property AsDateTime: TDateTime read GetDateTime write SetDateTime;
-     property AsDouble: Double read GetFloat write SetFloat;
-     property AsInteger: Int64 read GetInteger write SetInteger;
-     property AsString: string read GetString write SetString;
+     property VBytes: TBytes read GetBinary write SetValue;
+     property VBoolean: Boolean read GetBoolean write SetValue;
+     property VDateTime: TDateTime read GetDateTime write SetDateTime;
+     property VDouble: Double read GetFloat write SetFloat;
+     property VInteger: Int64 read GetInteger write SetInteger;
+     property VString: string read GetString write SetString;
   end;
 
   TSCLDocument = class
@@ -210,8 +218,10 @@ type
       function Free: PNodeArray;
     end;
   private
+    FBuffer: TStringBuffer;     // используется для работы с путями узлов
     FLookup: TArray<PSCLNode>;  // глобальная хэш таблица для таблиц
     FHashed: Integer;           // количество элементов в хэш-таблице
+    FRemoved: Integer;          // счётчик удалённых элементов в хэш-таблице
     FNodeArray: PNodeArray;     // цепочка хранилищ узлов документа
     FNextIndex: Integer;        // индекс следующего свободного узла
     FRootNode: PSCLNode;        // корневой узел документа
@@ -220,12 +230,13 @@ type
      function Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
     procedure GrowAndRehash;
     procedure InsertHashed(LookupIndex: Integer; Node: PSCLNode);
+    procedure RemoveSubTree(Node: PSCLNode);
   public
     constructor Create(Capacity: Integer = 0);
     destructor Destroy; override;
     procedure Clear;
     procedure Merge(Source: TSCLDocument);
-     function IsEmpty: Boolean;
+     function IsEmpty: Boolean; inline;
      property Root: PSCLNode read FRootNode;
   end;
 
@@ -242,8 +253,6 @@ resourcestring
   sTypeName_Table    = 'таблица';
 
 const
-  TIME_OFFSET_LOCAL = -1; // зарезервированное смещение времени для локальных дат
-
   SCLTypeNames: array [TSCLNodeType] of string = (
     sTypeName_Empty,
     '#Reserved', // do not localize!
@@ -263,12 +272,15 @@ uses
   System.DateUtils;
 
 const
+  REMOVED_NODE_LINK = PByte(1);
   SCL_NODE_SIZE = SizeOf(TSCLNode);
 
 {$IF SCL_NODE_SIZE > 32}{$Message Warn 'Превышен запланированный размер узла SCL в 32 байта!'}{$IFEND}
 
 resourcestring
   sAssignNotAllowed  = 'Не допускается прямое копирование элементов TSCLNode';
+  sBinaryValueTooBig = 'Слишком большой размер двоичных данных';
+  sCantMergeNodeType = 'Нельзя объединить документы с разным типом корневых узлов!';
   sConversionFailed  = 'Невозможно преобразовать элемент %s (%s) к типу ''%s''';
   sDuplicateItemName = 'Элемент %s уже существует в таблице %s';
   sIllegalNameChars  = 'Недопустимый символ в имени узла: ''%s''';
@@ -278,10 +290,7 @@ resourcestring
   sLookupTableIsFull = 'В массиве хэшей нет свободных мест';
   sNestedInlineError = 'Вложенные строчные массивы и таблицы не допускаются';
   sNoArrayNameAllowd = 'Элементы массива не могут иметь ключей';
-  sNoCommentInInline = 'Комментарии в строчных массивах и таблицах не допускаются';
   sNodeIsNotAParent  = 'Элемент %s [%s] не является массивом или таблицей';
-  sNoParentNodeFound = 'У элемента %s отсутствует родительский узел';
-  sNoRootNodeComment = 'Нельзя добавить комментарий к корневому узлу документа';
   sNoTextBlckAllowed = 'Текстовые блоки не допускаются внутри строчных массивов и таблиц';
   sReservedTypeError = 'Обнаружен недопустимый тип элемента';
   sTableItemNameRqrd = 'Для элементов таблиц необходимо указать не пустые имена';
@@ -294,41 +303,20 @@ resourcestring
 
 const
   FLAG_INLINE = $01; // строчный массив или таблица
-//  FLAG_DATA   = $02; // в массиве или таблице есть данные
 
 var
-  SCLNameBuilder: TStringBuffer = nil;
   SCLFormatSettings: TFormatSettings;
 
 type
-  TDateTimeParts = record
-    Year: Word;
-    Month: Word;
-    Day: Word;
-    Hour: Word;
-    Minute: Word;
-    Second: Word;
-  end;
-
   HDateTime = record helper for TDateTime
-    function Deconstruct: TDateTimeParts; inline;
+    function Deconstruct: TDecodedTime; inline;
   end;
 
 var
   SCLHexTable: TArray<LongWord>;
 
 function BinToHex(const Value: TBytes): string;
-
-  procedure InitializeHexTable; inline;
-  begin
-    SetLength(SCLHexTable, $100);
-    for var Index := 0 to High(SCLHexTable) do
-      SCLHexTable[Index] := Word(HexChars[Index and $0F]) shl 16 or Word(HexChars[Index shr 4]);
-  end;
-
 begin
-  if SCLHexTable = nil then
-    InitializeHexTable;
   SetLength(Result, Length(Value) shl 1 + 1);
   Result[1] := '%';
   var Buffer := PLongWord(@Result[2]);
@@ -370,7 +358,7 @@ end;
 
 { HDateTime }
 
-function HDateTime.Deconstruct: TDateTimeParts;
+function HDateTime.Deconstruct: TDecodedTime;
 begin
   var MSecs: Word;
   with Result do
@@ -430,7 +418,7 @@ begin
     else raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [GetPath, TypeName])
   end;
   { Проверяем предел количества дочерних элементов }
-  if FInfo = Smallint.MaxValue then
+  if FInfo = FInfo.MaxValue then
     raise ESCLError.CreateResFmt(@sTooManyChildItems, [GetPath]);
   { Вложенные массивы и таблицы запрещены для строчных }
   if (FSubType and FLAG_INLINE <> 0) and (AType in [ntArray, ntTable]) then
@@ -443,6 +431,7 @@ begin
       FFirst := Result;
     if FLast <> nil then
       FLast.FNext := Result;
+    Result.FPrev := FLast;
     FLast := Result;
     { Для таблиц дополнительно обновляем хэш-таблицу }
     if LookupIndex >= 0 then
@@ -537,8 +526,32 @@ begin
   end;
 end;
 
+procedure TSCLNode.RemoveNode(Node: PSCLNode);
+begin
+  if Node = nil then
+    raise ESCLError.CreateRes(@sInvalidItemLink);
+  if Node.FParent <> @Self then
+    raise ESCLError.CreateFmt('Узел %s не является дочерним узлом для %s', [Node.FName, FName]);
+  var SCLArray := PSCLArray(FValue);
+  SCLArray.FDocument.RemoveSubTree(Node);
+  { Восстанавливаем связность оставшихся элементов }
+  if Node = SCLArray.FFirst then
+    SCLArray.FFirst := Node.FNext
+  else if Node.FPrev <> nil then
+    Node.FPrev.FNext := Node.FNext;
+  if SCLArray.FLast = Node then
+    SCLArray.FLast := Node.FPrev
+  else if Node.FNext <> nil then
+    Node.FNext.FPrev := Node.FPrev;
+  { Завершаем удаление узла }
+  Node^ := Default(TSCLNode);
+  Dec(FInfo);
+end;
+
 function TSCLNode.AddValue(const AName: string; const Value: TBytes): PSCLNode;
 begin
+  if Length(Value) > MAX_BINARY_LENGTH then
+    Raise ESCLError.CreateRes(@sBinaryValueTooBig);
   Result := AddChild(AName, ntBinary);
   PBytes(@Result.FValue)^ := Value;
 end;
@@ -553,6 +566,20 @@ end;
 class operator TSCLNode.Assign(var Dest: TSCLNode; const [ref] Src: TSCLNode);
 begin
   raise ESCLError.CreateRes(@sAssignNotAllowed);
+end;
+
+function TSCLNode.CountNodesInSubtree: Integer;
+begin
+  Result := 1; // посчитали сами себя
+  if FType in [ntArray, ntTable] then
+  begin
+    var Item := PSCLArray(FValue).FFirst;
+    while Item <> nil do
+    begin
+      Inc(Result, Item.CountNodesInSubtree);
+      Item := Item.FNext;
+    end;
+  end;
 end;
 
 function TSCLNode.Exists(const AName: string; out LookupIndex: Integer): Boolean;
@@ -598,7 +625,7 @@ end;
 
 function TSCLNode.GetCount: Integer;
 begin
-  TypeCheckParent;
+  if not TypeCheckParent then Exit(0);
   Result := FInfo;
 end;
 
@@ -615,7 +642,7 @@ end;
 
 function TSCLNode.GetFirstChild: PSCLNode;
 begin
-  TypeCheckParent;
+  if not TypeCheckParent then Exit(nil);
   Result := PSCLArray(FValue).FFirst;
 end;
 
@@ -659,7 +686,7 @@ end;
 
 function TSCLNode.GetLastChild: PSCLNode;
 begin
-  TypeCheckParent;
+  if not TypeCheckParent then Exit(nil);
   Result := PSCLArray(FValue).FLast;
 end;
 
@@ -687,10 +714,10 @@ function TSCLNode.GetPath: string;
 var
   NodeStack: TArray<PSCLNode>;
 begin
-  if FType = ntReserved then Exit('');
-  if SCLNameBuilder = nil then
-    SCLNameBuilder := TStringBuffer.Create;
-  SCLNameBuilder.Reset.Append('/');
+  if IsRoot then Exit('/');
+  if (FType = ntReserved) or (FParent = nil) then Exit('');
+  var NameBuilder := PSCLArray(FValue).FDocument.FBuffer;
+  NameBuilder.Reset.Append('/');
   var Count := 0;
   var Node := PSCLNode(@Self);
   { Добавляем все узлы в стек, кроме корневого }
@@ -706,27 +733,17 @@ begin
   begin
     Node := NodeStack[Index];
     if Node.Parent.FType = ntArray then
-      SCLNameBuilder.Append('@').Append(IntToStr(Node.ItemIndex))
+      NameBuilder.Append('@').Append(IntToStr(Node.ItemIndex))
     else
-      SCLNameBuilder.Append('/').Append(Node.Name);
+      NameBuilder.Append('/').Append(Node.Name);
   end;
-  Result := SCLNameBuilder.ToString;
+  Result := NameBuilder.ToString;
 end;
 
 function TSCLNode.GetPrecision: TSCLPrecision;
 begin
   TypeCheck(ntFloat);
   Result := FSubType;
-end;
-
-function TSCLNode.GetPrev: PSCLNode;
-begin
-  if (FParent = nil) or IsFirst then
-    Exit(nil); // нет предыдущего элемента
-  Result := PSCLArray(FParent.FValue).FFirst;
-  var Node := @Self;
-  while (Result <> nil) and (Result.FNext <> Node) do
-    Result := Result.FNext;
 end;
 
 function TSCLNode.GetString: string;
@@ -747,9 +764,14 @@ begin
   Result := FInfo;
 end;
 
+function TSCLNode.IsEmpty: Boolean;
+begin
+  Result := (FType = ntEmpty) or (FType in [ntArray, ntTable]) and (FInfo = 0);
+end;
+
 function TSCLNode.IsFirst: Boolean;
 begin
-  Result := PSCLArray(FParent.FValue).FFirst = @Self;
+  Result := FPrev = nil;
 end;
 
 function TSCLNode.IsInline: Boolean;
@@ -760,17 +782,17 @@ end;
 
 function TSCLNode.IsLast: Boolean;
 begin
-  Result := PSCLArray(FParent.FValue).FLast = @Self;
+  Result := FNext = nil;
 end;
 
 function TSCLNode.IsRoot: Boolean;
 begin
-  Result := (FType in [ntArray, ntTable]) and (FParent = nil);
+  Result := (FParent = nil) and (FType in [ntEmpty, ntArray, ntTable]) and (FValue <> 0);
 end;
 
 function TSCLNode.ItemByPath(const NodePath: string): PSCLNode;
 begin
-  TypeCheckParent;
+  if not TypeCheckParent then Exit(nil);
   if NodePath.IsEmpty then
     raise ESCLError.CreateResFmt(@sInvalidNodePath, [NodePath]);
   var Path := PPChar(@NodePath)^;
@@ -818,16 +840,6 @@ begin
   end;
 end;
 
-function TSCLNode.SCLArray: PSCLArray;
-begin
-  if FType in [ntArray, ntTable] then
-    Result := PSCLArray(FValue)
-  else if FParent <> nil then
-    Result := FParent.SCLArray
-  else
-    raise ESCLError.CreateResFmt(@sNoParentNodeFound, [FName]) at ReturnAddress;
-end;
-
 procedure TSCLNode.SetDateTime(const Value: TDateTime);
 begin
   if ForceType(ntDateTime) then
@@ -837,7 +849,8 @@ end;
 
 procedure TSCLNode.SetFloat(const Value: Double);
 begin
-  ForceType(ntFloat);
+  if ForceType(ntFloat) then
+    FSubType := High(TSCLPrecision);
   PDouble(@FValue)^ := Value;
 end;
 
@@ -912,6 +925,8 @@ end;
 
 procedure TSCLNode.SetValue(const Value: TBytes);
 begin
+  if Length(Value) > MAX_BINARY_LENGTH then
+    Raise ESCLError.CreateRes(@sBinaryValueTooBig);
   ForceType(ntBinary);
   PBytes(@FValue)^ := Value;
 end;
@@ -924,7 +939,7 @@ end;
 
 function TSCLNode.ToArray: TArray<PSCLNode>;
 begin
-  TypeCheckParent;
+  if not TypeCheckParent then Exit(nil);
   SetLength(Result, FInfo);
   var Item := PSCLArray(FValue).FFirst;
   for var Index := 0 to High(Result) do
@@ -968,10 +983,10 @@ function TSCLNode.ToString: string;
       '%.4d-%.2d-%.2d', '%3:.2d:%4:.2d:%5:.2d');  // dtDateOnly / dtTimeOnly
     OffsetTypes: array [0..1] of TDateType = (dtAboveUTC, dtBelowUTC);
   begin
+    var DateType: TDateType;
+    var DateTimeValue: TDateTime := PDateTime(@FValue)^;
     var OffsetHours:   Word := 0;
     var OffsetMinutes: Word := 0;
-    var DateTimeValue: TDateTime := PDateTime(@FValue)^;
-    var DateType := dtUTC;
     case FInfo of
       -1: { Если время локальное, то проверяем на упрощённый формат }
           if Trunc(DateTimeValue) = 0 then
@@ -979,7 +994,7 @@ function TSCLNode.ToString: string;
           else if (Frac(DateTimeValue) = 0) then
             DateType := dtDateOnly
           else DateType := dtLocal;
-       0: ;
+       0: DateType := dtUTC;
     else
       var Offset: Word := Abs(FInfo);
       OffsetHours   := Offset div 60;
@@ -990,6 +1005,19 @@ function TSCLNode.ToString: string;
       Result := Format(DateFormats[DateType], [Year, Month, Day, Hour, Minute, Second, OffsetHours, OffsetMinutes]);
   end;
 
+  function DoubleToString(Value: Double): string;
+  begin
+    Result := Value.ToString(ffGeneral, FSubType, 0, SCLFormatSettings);
+    var Cursor := PPChar(@Result)^;
+    for var Index := 1 to Result.Length do
+    begin
+      case Cursor^ of
+        'A'..'Z': Cursor^ := Chr(Ord(Cursor^) or $20);
+      end;
+      Inc(Cursor);
+    end;
+  end;
+
 const
   BoolStrings: array [Boolean] of string = ('false', 'true');
 begin
@@ -998,12 +1026,12 @@ begin
     ntBinary:    Result := BinToHex(PBytes(@FValue)^);
     ntBoolean:   Result := BoolStrings[Boolean(FValue)];
     ntDateTime:  Result := DateTimeAsString;
-    ntFloat:     Result := PDouble(@FValue)^.ToString(ffGeneral, FSubType, 0, SCLFormatSettings).ToLower;
+    ntFloat:     Result := DoubleToString(PDouble(@FValue)^);
     ntInteger:   if FSubType = 0 then
                    Result := IntToStr(FValue)
                  else
                    Result := IntToBaseTwo(FValue, FSubType);
-    ntNull:      Result := '~';
+    ntNull:      Result := 'null';
     ntString:    Result := PString(@FValue)^;
     else raise ESCLError.CreateResFmt(@sConversionFailed, [FName, TypeName, sTypeName_String]);
   end;
@@ -1015,9 +1043,10 @@ begin
     raise ESCLError.CreateResFmt(@sInvalidValueType, [FName, TypeName, SCLTypeNames[RequiredType]]);
 end;
 
-procedure TSCLNode.TypeCheckParent;
+function TSCLNode.TypeCheckParent: Boolean;
 begin
-  if not (FType in [ntEmpty, ntArray, ntTable]) then
+  Result := FType in [ntArray, ntTable];
+  if not Result and (FType <> ntEmpty) then
     raise ESCLError.CreateResFmt(@sNodeIsNotAParent, [FName, TypeName]);
 end;
 
@@ -1053,10 +1082,11 @@ end;
 
 procedure TSCLDocument.Clear;
 begin
-  { Проверка на пустой документ }
-  if IsEmpty then Exit;
+  { Проверка на исходное состояние документа }
+  if (FRootNode.FType = ntEmpty) and (FNodeArray.Prev = nil) then Exit;
   { Обнуляем всю существующую структуру документа }
   FHashed := 0;
+  FRemoved := 0;
   FNextIndex := 0;
   { Удаляем все хранилища узлов, кроме первого }
   while FNodeArray.Prev <> nil do
@@ -1080,6 +1110,7 @@ begin
   FNodeArray := FNodeArray.Expand(Capacity);
   SetLength(FLookup, Capacity);
   FillChar(FLookup[0], Length(FLookup) * SizeOf(PSCLNode), 0);
+  FBuffer := TStringBuffer.Create(string.Empty);
   { Создаём основную таблицу документа  }
   FRootNode := CreateNode(nil, ntEmpty);
   FRootNode.FValue := CreateArray;
@@ -1113,6 +1144,7 @@ begin
   var NextArray := AtomicExchange(FNodeArray, nil);
   while NextArray <> nil do
     NextArray := NextArray.Free;
+  FBuffer.Free;
 end;
 
 function TSCLDocument.Find(Parent: PSCLNode; const Name: string; out Index: Integer): Boolean;
@@ -1121,13 +1153,21 @@ begin
   var Hash := HashFNV1a16(Parent, Name);
   var From := Integer(Hash and Mask);
   var Step := Integer(Hash shr 8 and Mask or 1);
+  var Removed := -1;
   Index := From;
   { Ищем по хэшу с индекса From и шагом Step }
   repeat
     var Item := FLookup[Index];
-    if Item = nil then
-      Exit(False) // элемент отсутствует в таблице
-    else if (Item.FParent = Parent) and ASCIISameName(Item.FName, Name) then
+    if PByte(Item) = nil then
+    begin
+      if Removed >= 0 then
+        Index := Removed;
+      Exit(False); // элемент отсутствует в таблице
+    end else if PByte(Item) = REMOVED_NODE_LINK then
+    begin
+      if Removed < 0 then
+        Removed := Index;
+    end else if (Item.FParent = Parent) and ASCIISameName(Item.FName, Name) then
       Exit(True); // элемент найден
     Index := (Index + Step) and Mask; // следующий шаг
   until Index = From;
@@ -1144,14 +1184,15 @@ begin
   if Lookups > Integer.MaxValue div 2 then // недостижимо при компиляции в 32-х битном режиме
     raise ESCLError.CreateRes(@sMaxHashSizeExceed);
   {$ENDIF}
-  SetLength(Rehashed, Lookups shl 1);
+  SetLength(Rehashed, Lookups shl Ord(FHashed > Length(FLookup) shr 1));
   FillChar(Rehashed[0], Length(Rehashed) * SizeOf(PSCLNode), 0);
   { Перераспределяем элементы из старого массива в новый }
+  var ItemCount := 0;
   var Mask: Cardinal := High(Rehashed);
   for var Index := 0 to Lookups - 1 do
   begin
     var Item := FLookup[Index];
-    if Item <> nil then
+    if PByte(Item) > REMOVED_NODE_LINK then
     begin
       var Hash := HashFNV1a16(Item.FParent, Item.FName);
       var From := Hash and Mask;
@@ -1160,37 +1201,70 @@ begin
       while Rehashed[Next] <> nil do
         Next := (Next + Step) and Mask;
       Rehashed[Next] := Item;
+      Inc(ItemCount);
     end;
   end;
   FLookup := Rehashed;
+  FHashed := ItemCount;
+  FRemoved := 0;
 end;
 
 procedure TSCLDocument.InsertHashed(LookupIndex: Integer; Node: PSCLNode);
 begin
+  if PByte(FLookup[LookupIndex]) = REMOVED_NODE_LINK then
+    Dec(FRemoved);
   FLookup[LookupIndex] := Node;
   Inc(FHashed);
-  if FHashed >= Length(FLookup) * 3 shr 2 then
+  if FHashed + FRemoved >= Length(FLookup) * 3 shr 2 then
     GrowAndRehash;
 end;
 
 function TSCLDocument.IsEmpty: Boolean;
 begin
-  Result := (FRootNode.FType = ntEmpty) and (FRootNode.FInfo = 0) and (FNodeArray.Prev = nil) and (FNextIndex = 2);
+  Result := FRootNode.IsEmpty;
 end;
 
 procedure TSCLDocument.Merge(Source: TSCLDocument);
 begin
-  if (FRootNode.FType <> Source.FRootNode.FType) and not IsEmpty then
-    raise ESCLError.Create('Нельзя объединить документы с разным типом корневых узлов!');
-  for var Item in Source.FRootNode^ do
-    FRootNode.MergeNodes(Item);
+  if (FRootNode.FType <> Source.FRootNode.FType) and (FRootNode.FType <> ntEmpty) then
+    raise ESCLError.CreateRes(@sCantMergeNodeType);
+  if Source <> Self then
+    for var Item in Source.FRootNode^ do
+      FRootNode.MergeNodes(Item);
+end;
+
+procedure TSCLDocument.RemoveSubTree(Node: PSCLNode);
+begin
+  { Удаление корневого узла документа }
+  if Node = FRootNode then
+  begin
+    Clear;
+    Exit;
+  end;
+  if (Node.FParent = nil) or (TSCLNode.PSCLArray(Node.Parent.FValue).FDocument <> Self) then
+    raise ESCLError.Create('Попытка удаления узла, не принадлежащего данному документу');
+  { Рекурсивно удаляем вложенные элементы }
+  if Node.FType in [ntArray, ntTable] then
+    for var Item in Node^ do
+    begin
+      RemoveSubTree(Item);
+      Item^ := Default(TSCLNode);
+    end;
+  { Если узел принадлежит таблице, то удаляем все узлы из хэш-таблицы }
+  var LookupIndex := -1;
+  if (Node.FParent.FType = ntTable) and Find(Node.FParent, Node.FName, LookupIndex) then
+  begin
+    FLookup[LookupIndex] := PSCLNode(REMOVED_NODE_LINK);
+    Dec(FHashed);
+    Inc(FRemoved);
+  end;
 end;
 
 initialization
   SCLFormatSettings := TFormatSettings.Create;
   SCLFormatSettings.DecimalSeparator := '.';
-
-finalization
-  FreeAndNil(SCLNameBuilder);
+  SetLength(SCLHexTable, $100);
+  for var Index := 0 to High(SCLHexTable) do
+    SCLHexTable[Index] := Word(HexChars[Index and $0F]) shl 16 or Word(HexChars[Index shr 4]);
 
 end.

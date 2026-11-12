@@ -27,6 +27,15 @@ type
     function SubString(Last: PChar): string; inline;
   end;
 
+  TDecodedTime = record
+    Year:   Word;
+    Month:  Word;
+    Day:    Word;
+    Hour:   Word;
+    Minute: Word;
+    Second: Word;
+  end;
+
   { Стек отступов для уровней документа }
   TIndentStack = record
   private const
@@ -34,39 +43,42 @@ type
   private
     FStack: TArray<Integer>;
     FCount: Integer;
-    function GetValue: Integer; inline;
+    FValue: Integer;
   public
     procedure Decrement;
     procedure Increment(ByValue: Integer); inline;
      function SetIndent(const AValue: Integer): Boolean;
     procedure Reset(BaseValue: Integer = 0);
-     property Value: Integer read GetValue;
+     property Value: Integer read FValue;
   end;
 
   { Облегчённый кастомный вариант TStringBuilder'а }
   TStringBuffer = class
   private const
     DEFAULT_BUFFER_SIZE = 256;
+    procedure SetLength(const Value: Integer); inline;
   protected
     FBuffer: string;
     FLength: Integer;
     FLineBreak: string;
      function CheckCapacity(Count: Integer): PChar;
   public
-    constructor Create;
+    constructor Create(const ALineBreaks: string);
      function Append(const Str: string): TStringBuffer; overload; inline;
-     function Append(Buf: PChar; Count: Integer): TStringBuffer; overload; inline; { TODO: проверить как работает inline }
+     function Append(Buf: PChar; Count: Integer): TStringBuffer; overload; inline;
      function Append(Ch: Char): TStringBuffer; overload; inline;
      function AppendLineBreak: TStringBuffer; inline;
      function Reset: TStringBuffer; inline;
-     function ToString: string; reintroduce;
-     function TrimBreaks: TStringBuffer;
-     property Length: Integer read FLength;
-     property LineBreak: string read FLineBreak write FLineBreak;
+     function ToString: string; override;
+    procedure TrimBreaks;
+    procedure TrimSpace; inline;
+     property Length: Integer read FLength write SetLength;
+     property LineBreak: string read FLineBreak;
   end;
 
 function ASCIISameName(const A, B: string): Boolean;
 function AsDigit(Ch: Char): Word; inline;
+function AsHexDigit(Ch: Char): Word; inline;
 function Max(A, B: Integer): Integer; inline;
 function Min(A, B: Integer): Integer; inline;
 function NextPowerOfTwo(Value, Default: Integer): Integer;
@@ -74,6 +86,16 @@ function ValidateNodeName(Source: PChar): PChar;
 
 const
   HexChars: array [0..15] of Char = '0123456789ABCDEF';
+  HexMap: array [$00..$7F] of Byte = (
+    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, // 00..0F
+    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, // 10..1F
+    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, // 20..2F
+    $00,$01,$02,$03,$04,$05,$06,$07,$08,$09,$FF,$FF,$FF,$FF,$FF,$FF, // 30..3F  '0'..'9'
+    $FF,$0A,$0B,$0C,$0D,$0E,$0F,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, // 40..4F  'A'..'F'
+    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, // 50..5F
+    $FF,$0A,$0B,$0C,$0D,$0E,$0F,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, // 60..6F  'a'..'f'
+    $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF  // 70..7F
+  );
 
   ESCAPE_NOT = $00;
   ESCAPE_CHR = $10; // экранирование подстановкой (\r\n)
@@ -120,20 +142,33 @@ const
 { Допустимый набор символов в соответствии с NameMap: 0..9, _, A..Z, a..z }
 function ASCIISameName(const A, B: string): Boolean;
 begin
-  { Тривиальные случаи: пустые строки или разные длины строк }
-  var Source := PByte(A);
-  if (Source = nil) or (A.Length <> B.Length) then Exit(Source = nil);
   { Получаем указатели на строки как на массив слов и смещение }
+  var Source := PByte(A);
   var Index: NativeInt := PByte(B) - Source;
+  { Тривиальные случаи: пустые строки или разные длины строк }
+  if (Source = nil) or (A.Length <> B.Length) then Exit(Index = 0); // B = Source = nil
   { Сравниваем без учёта регистра }
   while (Source^ <> 0) and ((Source^ xor Source[Index]) and $DF = 0) do
     Inc(Source, SizeOf(Char));
-  Result := Source[Index] = 0;
+  Result := Source^ = Source[Index]; // = 0
 end;
 
 function AsDigit(Ch: Char): Word; inline;
 begin
-  Result := Word(Ord(Ch) - Word('0'));
+  Result := Word(Ord(Ch) - Ord('0'));
+end;
+
+//function AsHexDigit(Ch: Char): Word; assembler;
+//asm
+//  mov   edx, eax
+//  and   edx, $7F
+//  and   ax, $FF80
+//  or    al, byte ptr HexMap[edx]
+//end;
+
+function AsHexDigit(Ch: Char): Word; inline;
+begin
+  Result := HexMap[Ord(Ch) and $7F] or (Ord(Ch) and $FF80);
 end;
 
 function Max(A, B: Integer): Integer; inline;
@@ -207,14 +242,14 @@ end;
 function TStringBuffer.CheckCapacity(Count: Integer): PChar;
 begin
   if FBuffer.Length - FLength < Count then
-    SetLength(FBuffer, NextPowerOfTwo(FLength + Count, DEFAULT_BUFFER_SIZE));
+    System.SetLength(FBuffer, NextPowerOfTwo(FLength + Count, DEFAULT_BUFFER_SIZE));
   Result := PPChar(@FBuffer)^ + FLength;
   Inc(FLength, Count);
 end;
 
-constructor TStringBuffer.Create;
+constructor TStringBuffer.Create(const ALineBreaks: string);
 begin
-  FLineBreak := sLineBreak;
+  FLineBreak := ALineBreaks;
 end;
 
 function TStringBuffer.Reset: TStringBuffer;
@@ -223,22 +258,33 @@ begin
   Result := Self;
 end;
 
+procedure TStringBuffer.SetLength(const Value: Integer);
+begin
+  if Value < FLength then
+    FLength := Max(Value, 0);
+end;
+
 function TStringBuffer.ToString: string;
 begin
   SetString(Result, PPChar(@FBuffer)^, FLength);
 end;
 
-function TStringBuffer.TrimBreaks: TStringBuffer;
+procedure TStringBuffer.TrimBreaks;
 begin
-  var Source: PChar := @FBuffer[FLength];
-  for var Index := FLength downto 1 do
-    case Source^ of
-      #10, #13: Dec(Source);
-    else
-      FLength := Index;
-      Break;
+  var Source := PPChar(@FBuffer)^ - 1;
+  var Cursor := Source + FLength;
+  while Cursor > Source do
+    case Cursor^ of
+      #10, #13: Dec(Cursor);
+      else Break;
     end;
-  Result := Self;
+  FLength := Cursor - Source;
+end;
+
+procedure TStringBuffer.TrimSpace;
+begin
+  if (FLength > 0) and (FBuffer[FLength] = #32) then
+    Dec(FLength);
 end;
 
 { TIndentStack }
@@ -246,35 +292,34 @@ end;
 procedure TIndentStack.Decrement;
 begin
   if FCount > 0 then
+  begin
     Dec(FCount);
-end;
-
-function TIndentStack.GetValue: Integer;
-begin
-  Result := FStack[FCount];
+    FValue := FStack[FCount];
+  end;
 end;
 
 procedure TIndentStack.Increment(ByValue: Integer);
 begin
-  SetIndent(FStack[FCount] + ByValue);
+  SetIndent(FValue + ByValue);
 end;
 
 procedure TIndentStack.Reset(BaseValue: Integer);
 begin
   SetLength(FStack, DEFAULT_STACK_SIZE);
   FCount := 0;
-  FStack[FCount] := BaseValue;
+  FValue := BaseValue;
 end;
 
 function TIndentStack.SetIndent(const AValue: Integer): Boolean;
 begin
-  Result := (FCount = 0) or (AValue > FStack[FCount] + 1);
+  Result := (FCount = 0) or (AValue > FValue + 1);
   if Result then
   begin
     if FCount >= Length(FStack) then
       SetLength(FStack, NextPowerOfTwo(FCount + 1, DEFAULT_STACK_SIZE));
+    FStack[FCount] := FValue;
     Inc(FCount);
-    FStack[FCount] := AValue;
+    FValue := AValue;
   end;
 end;
 

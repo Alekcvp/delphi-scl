@@ -44,9 +44,8 @@ type
     procedure WriteTextString(const Value: string);
     procedure WriteWrappedString(const Value: string);
   public
-    constructor Create(AIndentStep: Integer = 4; AWrapWidth: Integer = 80);
+    constructor Create(AIndentStep: Integer = 2; AWrapWidth: Integer = 80);
     destructor Destroy; override;
-    procedure SetLineBreaks(const LineBreak: string); inline;
      function WriteDocument(Document: TSCLDocument): string; overload;
     procedure WriteDocument(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding); overload;
     class procedure WriteFile(const AFileName: string; Document: TSCLDocument; Encoding: TEncoding);
@@ -136,7 +135,7 @@ constructor TSCLWriter.Create(AIndentStep, AWrapWidth: Integer);
 begin
   SetIndentStep(AIndentStep);
   SetWrapWidth(AWrapWidth);
-  FTextBuffer := TStringBuffer.Create;
+  FTextBuffer := TStringBuffer.Create(sLineBreak);
 end;
 
 destructor TSCLWriter.Destroy;
@@ -149,11 +148,6 @@ begin
   if Word(Value - 2) > 6 then
     raise ESCLWritingException.CreateRes(@sInvalidIndntStp);
   FIndentStep := Value;
-end;
-
-procedure TSCLWriter.SetLineBreaks(const LineBreak: string);
-begin
-  FTextBuffer.LineBreak := LineBreak;
 end;
 
 procedure TSCLWriter.SetWrapWidth(const Value: Integer);
@@ -391,22 +385,25 @@ procedure TSCLWriter.WriteWrappedString(const Value: string);
 
   function FindWrap(Source: PChar; WrapLength, Length: Integer): Integer;
   begin
+    if Length < WrapLength then
+      Exit(Length); // нет смысла искать пробел
     Inc(Source, WrapLength);
-    if Source^ = #32 then
-      Exit(WrapLength);
-    for var Index := 1 to WrapLength shr 2 do
-    begin
-      if (Source - Index)^ = #32 then
-        Exit(WrapLength - Index)
-      else if ((Source + Index)^ = #32) or (Index = Length) then
-        Exit(WrapLength + Index);
-    end;
-    Result := 0;
+    Dec(Length, WrapLength);
+    Result := WrapLength;
+    if Source^ <> #32 then
+      for var Index := 1 to WrapLength shr 2 do
+        if (Source - Index)^ = #32 then
+          Exit(WrapLength - Index)
+        else if Index = Length then
+          Exit(Length)
+        else if (Source + Index)^ = #32 then
+          Exit(WrapLength + Index);
   end;
 
 begin
   { Сохраняем длину текста и ссылку на него }
   var Source := PPChar(@Value)^;
+  var Length := Value.Length;
   { Увеличиваем значение отступа }
   FIndent.Increment(FIndentStep);
   { Записываем идентификатор свёрнутого текста и отступ при необходимости }
@@ -416,20 +413,19 @@ begin
   FTextBuffer.AppendLineBreak;
   { Ширина текста не может быть меньше чем MIN_WRAPPED_WIDTH }
   var WrapLength := Max(FWrapWidth - FIndent.Value, MIN_WRAPPED_WIDTH);
-  var Checkpoint := Source + Value.Length - WrapLength;
-  while Source < Checkpoint do
+  while Length > 0 do
   begin
     FTextBuffer.Indent(FIndent.Value);
-    var WrapIndex := FindWrap(Source, WrapLength, Checkpoint - Source);
-    if WrapIndex > 0 then
-    begin
-      FTextBuffer.Append(Source, WrapIndex);
-      Inc(Source, WrapIndex + 1);
-    end else
-    begin
-      FTextBuffer.Append(Source, WrapLength).Append('\');
-      Inc(Source, WrapLength);
-    end;
+    { Ищем следующий пробел-разделитель }
+    var WrapIndex := Min(Length, FindWrap(Source, WrapLength, Length));
+    FTextBuffer.Append(Source, WrapIndex);
+    { Сдвигаем позицию в строке }
+    Inc(Source, WrapIndex);
+    Dec(Length, WrapIndex);
+    if Source^ = #32 then
+      Inc(Source)               // пропускаем пробел
+    else if Length > 0 then
+      FTextBuffer.Append('\');  // мы не нашли пробел
     FTextBuffer.AppendLineBreak;
   end;
   { Уменьшаем значение отступа }
