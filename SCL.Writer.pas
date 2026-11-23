@@ -19,6 +19,9 @@ interface
 uses
   {$IFDEF MSWINDOWS} Winapi.Windows, {$ENDIF} System.SysUtils, SCL.Common, SCL.Document;
 
+const
+  WRAP_BIAS = 8;
+
 type
   ESCLWritingException = class(Exception);
 
@@ -71,6 +74,34 @@ resourcestring
   sInvalidTextChar = 'Недопустимый символ в текстовом блоке (0x%.2x)';
   sInvalidWrapChar = 'Недопустимый символ в свёрнутой строке (0x%.2x)';
   sUnknownStrType  = 'Неизвестный тип строки ''%s'' (%d)';
+
+const
+  LW_CRLF = $000A000D;
+
+  ESCAPE_NOT = $00;
+  ESCAPE_CHR = $01; // экранирование подстановкой (\r\n)
+  ESCAPE_ORD = $02; // экранирование кодом (\x00)
+
+  STR_VALID  = %0000;
+  STR_QUOTE  = %0001;
+  STR_BREAK  = %0010;
+  STR_SPACE  = %0100;
+
+  MASK_LSTR  = %1011; // quote valid, break invalid, space ignored, $F - invalid char
+  MASK_TEXT  = %1010; // quote ignored, break valid, space ignored, $F - invalid char
+  MASK_WRAP  = %1110; // quote ignored, break valid, space wrapped, $F - invalid char
+
+  StringMap: TASCIIMap = (
+  {  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F   }
+    $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $1F, $10, $12, $2F, $1F, $12, $2F, $2F, // 0
+    $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, $2F, // 1
+    $04, $00, $F0, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $00, $00, // 2
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, // 3
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, // 4
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $F0, $00, $00, $00, // 5
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, // 6
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $2F  // 7
+  );
 
 type
   HSCLNode = record helper for TSCLNode
@@ -205,7 +236,7 @@ begin
     if Word(Ch) and $FF80 = 0 then
     begin
       { Допускаются любые символы }
-      case StringMap[Ch] and $F0 of
+      case StringMap[Ch] shr 4 of
         ESCAPE_NOT: Continue;
         ESCAPE_CHR: FTextBuffer.Append(Source, Cursor - Source).Append('\').Append(EscapeChars[Ch]);
         ESCAPE_ORD: FTextBuffer.Append(Source, Cursor - Source).AppendByCode(Ch);
@@ -239,10 +270,9 @@ begin
     var Ch := Cursor^;
     if Word(Ch) and $FF80 = 0 then
       { Допускаются любые символы, кроме непечатных и переносов строки }
-      case StringMap[Ch] and $0F of
-        STR_VALID, STR_ESCAPE: ;
+      case StringMap[Ch] and MASK_LSTR of
+        STR_VALID: ;
         STR_QUOTE:
-          if Ch = #39 then         
           begin
             { Кавычки - допускаются, но удваиваются в строке }
             FTextBuffer.Append(Source, Cursor - Source).Append(#39#39);
@@ -286,10 +316,10 @@ begin
       WriteSubTree(Node);
     ntString:
       case Node.StringType of
-        stDefault: WriteEscapedString(Node.asString, Suffix);
-        stLiteral: WriteLiteralString(Node.AsString, Suffix);
-        stText:    WriteTextString(Node.AsString);
-        stWrapped: WriteWrappedString(Node.AsString);
+        stDefault: WriteEscapedString(Node.VString, Suffix);
+        stLiteral: WriteLiteralString(Node.VString, Suffix);
+        stText:    WriteTextString(Node.VString);
+        stWrapped: WriteWrappedString(Node.VString);
         else raise ESCLWritingException.CreateResFmt(@sUnknownStrType, [Node.Name, Ord(Node.StringType)]);
       end;
     else FTextBuffer.Append(Node.ToString).Append(Suffix);
@@ -339,18 +369,20 @@ begin
 end;
 
 procedure TSCLWriter.WriteTextString(const Value: string);
-const
-  LW_CRLF = $000A000D;
 begin
   { Сохраняем ссылку на начало исходного текста }
   var Source := PPChar(@Value)^;
   { Записываем идентификатор текстового блока и отступ при необходимости }
   FTextBuffer.Append('|');
-  if (Source <> nil) and (Source^ = #32) then
-    FTextBuffer.Append(IntToStr(FIndentStep));
-  { Если строка завершается переносом строки, то отключаем обрезку }
-  if (Source <> nil) and ((Source^ = #10) or (Source^ = #13))then
-    FTextBuffer.Append('+');
+  if Source <> nil then
+  begin
+    if Source^ = #32 then
+      FTextBuffer.Append(IntToStr(FIndentStep));
+    { Если строка завершается переносом строки, то отключаем обрезку }
+    case Source[Value.Length - 1] of
+      #10, #13: FTextBuffer.Append('+');
+    end;
+  end;
   FTextBuffer.AppendLineBreak;
   { Увеличиваем значение отступа }
   FIndent.Increment(FIndentStep);
@@ -362,8 +394,8 @@ begin
     var Ch := Cursor^;
     if Word(Ch) and $FF80 = 0 then
       { Допускаются любые символы, кроме непечатных }
-      case StringMap[Ch] and $0F of
-        STR_VALID, STR_ESCAPE, STR_QUOTE: ;
+      case StringMap[Ch] and MASK_TEXT of
+        STR_VALID: ;
         STR_BREAK:
           begin
             FTextBuffer.Indent(FIndent.Value).Append(Source, Cursor - Source).AppendLineBreak;
@@ -385,51 +417,78 @@ procedure TSCLWriter.WriteWrappedString(const Value: string);
 
   function FindWrap(Source: PChar; WrapLength, Length: Integer): Integer;
   begin
-    if Length < WrapLength then
-      Exit(Length); // нет смысла искать пробел
-    Inc(Source, WrapLength);
-    Dec(Length, WrapLength);
-    Result := WrapLength;
-    if Source^ <> #32 then
-      for var Index := 1 to WrapLength shr 2 do
-        if (Source - Index)^ = #32 then
-          Exit(WrapLength - Index)
-        else if Index = Length then
-          Exit(Length)
-        else if (Source + Index)^ = #32 then
-          Exit(WrapLength + Index);
+    var NonWrapped := Min(WrapLength - WRAP_BIAS, Length) - 1;
+    { Сначала ищем переносы строки в начале строки }
+    for var Index := 0 to NonWrapped do
+      if Word(Source^) and $FF80 <> 0 then
+        Inc(Source)
+      else case StringMap[Source^] and MASK_TEXT of
+        STR_VALID: Inc(Source);
+        STR_BREAK: Exit(Index);
+        else raise ESCLWritingException.CreateResFmt(@sInvalidTextChar, [Ord(Source^)]);
+      end;
+    { Потом ищем переносы строки и пробелы в конце строки }
+    Result := 0;
+    for var Index := NonWrapped + 1 to Min(WrapLength + WRAP_BIAS, Length - 1) do
+    begin
+      if Word(Source^) and $FF80 = 0 then
+        case StringMap[Source^] and MASK_WRAP of
+          STR_VALID: ;
+          STR_BREAK: Exit(Index); // перенос строки приоритетнее пробела
+          STR_SPACE: if Abs(WrapLength - Index) < Abs(WrapLength - Result) then Result := Index;
+          else raise ESCLWritingException.CreateResFmt(@sInvalidTextChar, [Ord(Source^)]);
+        end;
+      Inc(Source);
+    end;
+    { Если не нашли ничего, то возвращаем WrapLength }
+    if Result = 0 then
+      Result := Min(WrapLength, Length);
   end;
 
 begin
-  { Сохраняем длину текста и ссылку на него }
+  { Сохраняем ссылки на текст и границу текста }
   var Source := PPChar(@Value)^;
-  var Length := Value.Length;
-  { Увеличиваем значение отступа }
-  FIndent.Increment(FIndentStep);
-  { Записываем идентификатор свёрнутого текста и отступ при необходимости }
+  var Bounds := Source + Value.Length;
+  var Indent := FIndent.Value + FIndentStep;
+  { Записываем идентификатор свёрнутого текста }
   FTextBuffer.Append('>');
-  if (Source <> nil) and (Source^ = #32) then
-    FTextBuffer.Append(IntToStr(FIndentStep));
-  FTextBuffer.AppendLineBreak;
-  { Ширина текста не может быть меньше чем MIN_WRAPPED_WIDTH }
-  var WrapLength := Max(FWrapWidth - FIndent.Value, MIN_WRAPPED_WIDTH);
-  while Length > 0 do
+  if Source >= Bounds then
   begin
-    FTextBuffer.Indent(FIndent.Value);
+    { Пустая строка }
+    FTextBuffer.AppendLineBreak;
+    Exit;
+  end;
+  { Для пустых строк и строк, начинающихся с пробела, пишем отступ принудительно }
+  case Source^ of
+   #10, #13, #32: FTextBuffer.Append(IntToStr(FIndentStep));
+  end;
+  { Если строка завершается переносом строки, то отключаем обрезку }
+  case Bounds[-1] of
+    #10, #13: FTextBuffer.Append('+');
+  end;
+  { Ширина текста не может быть меньше чем MIN_WRAPPED_WIDTH }
+  var WrapLength := Max(FWrapWidth - Indent, MIN_WRAPPED_WIDTH);
+  repeat
     { Ищем следующий пробел-разделитель }
-    var WrapIndex := Min(Length, FindWrap(Source, WrapLength, Length));
-    FTextBuffer.Append(Source, WrapIndex);
+    var WrapIndex := FindWrap(Source, WrapLength, Bounds - Source);
+    FTextBuffer.AppendLineBreak.Indent(Indent).Append(Source, WrapIndex);
+    { Обрабатываем разделитель }
+    case Source[WrapIndex] of
+      #00: Break; // завершение строки
+      #10, #13:
+        begin
+          { При пустом параграфе дополнительная пустая строка не вставляется }
+          if WrapIndex > 0 then
+            FTextBuffer.AppendLineBreak;
+          Inc(WrapIndex, 1 + Ord(PDWord(@Source[WrapIndex])^ = LW_CRLF));
+        end;
+      #32: Inc(WrapIndex);
+      else FTextBuffer.Append('\');
+    end;
     { Сдвигаем позицию в строке }
     Inc(Source, WrapIndex);
-    Dec(Length, WrapIndex);
-    if Source^ = #32 then
-      Inc(Source)               // пропускаем пробел
-    else if Length > 0 then
-      FTextBuffer.Append('\');  // мы не нашли пробел
-    FTextBuffer.AppendLineBreak;
-  end;
-  { Уменьшаем значение отступа }
-  FIndent.Decrement;
+  until False;
+  FTextBuffer.AppendLineBreak;
 end;
 
 end.

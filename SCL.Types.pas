@@ -9,42 +9,32 @@ type
   TSCLPrecision  = 0..16;
   TSCLNumberBase = (nbDefault, nbBin, nbHex, nbOct);
   TSCLStringType = (stDefault, stLiteral, stText, stWrapped);
+  TSCLValueState = (vsDefault, vsRequired, vsDontWrite, vsIgnore);
 
-  SCLBaseAttribute = class(TCustomAttribute)
-  private
-    FNumberBase: TSCLNumberBase;
-  public
-    constructor Create(const ANumberBase: TSCLNumberBase);
-    property NumberBase: TSCLNumberBase read FNumberBase;
-  end;
-
-  SCLCommentAttribute = class(TCustomAttribute)
-  private
-    FComment: string;
-  public
-    constructor Create(const AComment: string);
-    property Comment: string read FComment;
-  end;
-
-  SCLInlineAttribute = class(TCustomAttribute)
-  end;
-
-  SCLNameAttribute = class(TCustomAttribute)
+  SCLInfoAttribute = class(TCustomAttribute)
   private
     FName: string;
+    FComment: string;
+    FState: TSCLValueState;
   public
-    constructor Create(const AName: string);
-    property Name: string read FName;
+    constructor Create(const AComment: string = string.Empty); overload;
+    constructor Create(const AName: string; const AComment: string = string.Empty); overload;
+    constructor Create(const AName: string; AState: TSCLValueState = vsDefault; const AComment: string = string.Empty); overload;
+    constructor Create(AState: TSCLValueState = vsDefault; const AComment: string = string.Empty); overload;
+    procedure TrySetName(var Name: string);
+    property Comment: string read FComment;
+    property State: TSCLValueState read FState;
   end;
 
-  SCLStateAttribute = class(TCustomAttribute)
-  public type
-    TValueState = (vsDefault, vsRequired, vsDontWrite, vsIgnore);
+  SCLNumberAttribute = class(TCustomAttribute)
   private
-    FState: TValueState;
+    FNumberBase: TSCLNumberBase;
+    FPrecision: TSCLPrecision;
   public
-    constructor Create(const AState: TValueState);
-    property State: TValueState read FState;
+    constructor Create(const ANumberBase: TSCLNumberBase); overload;
+    constructor Create(const APrecision: TSCLPrecision); overload;
+    property NumberBase: TSCLNumberBase read FNumberBase;
+    property Precision: TSCLPrecision read FPrecision;
   end;
 
   SCLStringAttribute = class(TCustomAttribute)
@@ -55,37 +45,57 @@ type
     property StringType: TSCLStringType read FStringType;
   end;
 
+  SCLInlineAttribute = class(TCustomAttribute)
+  end;
+
   SCLTimeZoneAttribute = class(TCustomAttribute)
   end;
 
 implementation
 
-{ SCLBaseAttribute }
+{ SCLInfoAttribute }
 
-constructor SCLBaseAttribute.Create(const ANumberBase: TSCLNumberBase);
-begin
-  FNumberBase := ANumberBase;
-end;
-
-{ SCLNameAttribute }
-
-constructor SCLNameAttribute.Create(const AName: string);
-begin
-  FName := AName;
-end;
-
-{ SCLCommentAttribute }
-
-constructor SCLCommentAttribute.Create(const AComment: string);
+constructor SCLInfoAttribute.Create(const AComment: string);
 begin
   FComment := AComment;
 end;
 
-{ SCLStateAttribute }
-
-constructor SCLStateAttribute.Create(const AState: TValueState);
+constructor SCLInfoAttribute.Create(const AName, AComment: string);
 begin
+  FName := AName;
+  FComment := AComment;
+end;
+
+constructor SCLInfoAttribute.Create(const AName: string; AState: TSCLValueState; const AComment: string);
+begin
+  FName := AName;
+  FComment := AComment;
   FState := AState;
+end;
+
+constructor SCLInfoAttribute.Create(AState: TSCLValueState; const AComment: string);
+begin
+  FComment := AComment;
+  FState := AState;
+end;
+
+procedure SCLInfoAttribute.TrySetName(var Name: string);
+begin
+  if FName <> string.Empty then
+    Name := FName;
+end;
+
+{ SCLNumberAttribute }
+
+constructor SCLNumberAttribute.Create(const APrecision: TSCLPrecision);
+begin
+  FPrecision := APrecision;
+end;
+
+constructor SCLNumberAttribute.Create(const ANumberBase: TSCLNumberBase);
+begin
+  FNumberBase := ANumberBase;
+  FPrecision := High(FPrecision); // максимальная точность по умолчанию
 end;
 
 { SCLStringAttribute }

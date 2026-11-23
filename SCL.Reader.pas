@@ -186,6 +186,24 @@ const
     sValueOutOfRange             // peValueOutOfRange
   );
 
+const
+  STR_VALID  = $00;
+  STR_QUOTE  = $01;
+  STR_BREAK  = $02;
+  STR_ESCAPE = $04;
+
+  StringMap: TASCIIMap = (
+  {  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F   }
+    $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $00, $02, $FF, $FF, $02, $FF, $FF, // 0
+    $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, // 1
+    $00, $00, $01, $00, $00, $00, $00, $01, $00, $00, $00, $00, $00, $00, $00, $00, // 2
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, // 3
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, // 4
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $04, $00, $00, $00, // 5
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, // 6
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $FF  // 7
+  );
+
 function IsDateOrTime(Source: PChar): Boolean;
 const
   Values: array [0..4] of Char = ('0', '0', ':', '0', '-');
@@ -206,37 +224,17 @@ begin
   Result := Source^;
 end;
 
-function SameToken(var Source: PChar; Token: PChar): Boolean;
-begin
-  var Index := Source - Token;
-  while Token^ = '?' do Inc(Token);
-  { Проверка на Token^ = #0 не нужна, т.к. Word(#0) or $20 = $20 <> Word(#0) всегда! }
-  while Word(Token[Index]) or $20 = Word(Token^) do Inc(Token);
-  Result := Token^ = #0;
-  if Result then
-    Source := Token + Index;
-end;
-
 function SkipSpaces(Source: PChar): PChar; inline;
 begin
-  while Source^ = #32 do
-    Inc(Source);
+  while Source^ = #32 do Inc(Source);
   Result := Source;
 end;
 
-function SkipToLineEnd(Source: PChar): PChar; overload; inline;
+function SkipToLineEnd(Source: PChar): PChar; inline;
 begin
-  while (Word(Source^) and $FF80 <> 0) or (StringMap[Source^] and $01 = 0) do
+  while (Word(Source^) and $FF80 <> 0) or (StringMap[Source^] and STR_BREAK = 0) do
     Inc(Source);
   Result := Source;
-end;
-
-function SkipToLineEnd(Source: PChar; out Length: Integer): PChar; overload; inline;
-begin
-  Result := Source;
-  while (Word(Result^) and $FF80 <> 0) or (StringMap[Result^] and $01 = 0) do
-    Inc(Result);
-  Length := Result - Source;
 end;
 
 function TestIndent(var Cursor: PChar; out Source: PChar; Indent: Integer): Boolean;
@@ -496,16 +494,26 @@ end;
 
 procedure TSCLReader.ParseNodeValue(var ParentNode: PSCLNode; const NodeName: string);
 
-  procedure ValidateValue(Token: PChar; Value: Boolean); overload;
+  function SameToken(Source, Token: PChar): Boolean;
   begin
-    if SameToken(FCursor, Token) then
+    var Index := Source - Token;
+    { Проверка на Token^ = #0 не нужна, т.к. Word(#0) or $20 = $20 <> Word(#0) всегда! }
+    while Word(Token[Index]) or $20 = Word(Token^) do Inc(Token);
+    Result := Token^ = #0;
+    if Result then
+      FCursor := Token + Index;
+  end;
+
+  procedure ValidateValue(Source, Token: PChar; Value: Boolean); overload;
+  begin
+    if SameToken(Source, Token) then
       ParentNode.AddValue(NodeName, Value)
     else RaiseParsingError(peUnknownIdentifier);
   end;
 
-  procedure ValidateValue(Token: PChar; Value: Double); overload;
+  procedure ValidateValue(Source, Token: PChar; Value: Double); overload;
   begin
-    if SameToken(FCursor, Token) then
+    if SameToken(Source, Token) then
       ParentNode.AddValue(NodeName, Value)
     else RaiseParsingError(peUnknownIdentifier);
   end;
@@ -522,13 +530,13 @@ begin
          end;
     '1'..'9': ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor);
     '+': case Char(Word(FCursor[1]) or $20) of
-           'i': ValidateValue('??nf', Double.PositiveInfinity);
-           'n': ValidateValue('??an', Double.NaN);
+           'i': ValidateValue(FCursor + 2, 'nf', Double.PositiveInfinity);
+           'n': ValidateValue(FCursor + 2, 'an', Double.NaN);
            else ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor + 1, 1);
          end;
     '-': case Char(Word(FCursor[1]) or $20) of
-           'i': ValidateValue('??nf', Double.NegativeInfinity);
-           'n': ValidateValue('??an', Double.NaN);
+           'i': ValidateValue(FCursor + 2, 'nf', Double.NegativeInfinity);
+           'n': ValidateValue(FCursor + 2, 'an', Double.NaN);
            else ParseNumberOrDate(ParentNode.AddNode(NodeName, ntEmpty), FCursor + 1, -1);
          end;
     #34: ParentNode.AddValue(NodeName, ReadString, stDefault);
@@ -541,17 +549,15 @@ begin
   else
     { Специальные значения без учёта регистра }
     case Char(Word(FCursor^) or $20) of
-      'f': ValidateValue('?alse', False);
-      'i': ValidateValue('?nf', Double.PositiveInfinity);
-      'n': if FCursor[1] = 'o' then
-           begin
-             ParentNode.AddValue(NodeName, False);
-             Inc(FCursor, 2);
-           end else if SameToken(FCursor, '?ull') then
+      'f': ValidateValue(FCursor + 1, 'alse', False);
+      'i': ValidateValue(FCursor + 1, 'nf', Double.PositiveInfinity);
+      'n': if SameToken(FCursor + 1, 'o') then
+             ParentNode.AddValue(NodeName, False)
+           else if SameToken(FCursor + 1, 'ull') then
              ParentNode.AddNode(NodeName, ntNull)
-           else ValidateValue('?an', Double.NaN);
-      't': ValidateValue('?rue', True);
-      'y': ValidateValue('?es', True);
+           else ValidateValue(FCursor + 1, 'an', Double.NaN);
+      't': ValidateValue(FCursor + 1, 'rue', True);
+      'y': ValidateValue(FCursor + 1, 'es', True);
       else RaiseParsingError(ParsingErrors[FCursor^ < #32]);
     end;
   end;
@@ -616,7 +622,7 @@ procedure TSCLReader.ParseNumberOrDate(Node: PSCLNode; Source: PChar; Sign: Inte
 
 const
   MaxValues: array [-1..1] of UInt64 = (UInt64(Int64.MinValue), 0, Int64.MaxValue);
-  DateChars: array [2..4] of Char = (':', #0, '-'); // актуально только 2 и 4
+  DateChars: array [ 2..4] of Char = (':', #0, '-'); // актуально только 2 и 4
 begin
   { Инициализация и определение знака }
   var Buffer: UInt64 := 0;
@@ -648,7 +654,7 @@ begin
   end;
   if Word(Source^) or $20 = Word('e') then
     Exponent := ReadExponent;
-  if Sign = 0 then Inc(Sign); // нормализуем неявный знак
+  Sign := Sign or 1; // нормализуем неявный знак
   if Fraction or Exponent = 0 then
   begin
     { Целое число без дробной или экспоненциальной части }
@@ -660,9 +666,9 @@ begin
     var Value := Double(Power10(Extended(Buffer) * Sign, Exponent - Fraction));
     if Value.SpecialType in [fsInf, fsNInf, fsNaN, fsZero, fsNZero] then
       RaiseParsingError(peValueOutOfRange);
-    Node.AsDouble := Value;
+    Node.VDouble := Value;
   end else
-    Node.AsDouble := 0.0 * Sign;
+    Node.VDouble := 0.0 * Sign;
   FCursor := Source;
 end;
 
@@ -692,7 +698,8 @@ begin
         '#': FCursor := SkipToLineEnd(FCursor + 1);
       else
         ParseNode(CurrentNode);
-        if FCursor = FSource then Continue;
+        if FCursor = FSource then
+          Continue; // уже на новой строке
       end;    
       SkipLineBreak(FCursor);
     until False;

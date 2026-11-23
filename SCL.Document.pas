@@ -278,6 +278,7 @@ const
 {$IF SCL_NODE_SIZE > 32}{$Message Warn 'Превышен запланированный размер узла SCL в 32 байта!'}{$IFEND}
 
 resourcestring
+  sAlienDocumentNode = 'Попытка удаления узла, не принадлежащего данному документу';
   sAssignNotAllowed  = 'Не допускается прямое копирование элементов TSCLNode';
   sBinaryValueTooBig = 'Слишком большой размер двоичных данных';
   sCantMergeNodeType = 'Нельзя объединить документы с разным типом корневых узлов!';
@@ -285,6 +286,7 @@ resourcestring
   sDuplicateItemName = 'Элемент %s уже существует в таблице %s';
   sIllegalNameChars  = 'Недопустимый символ в имени узла: ''%s''';
   sInvalidItemLink   = 'Недопустимая ссылка на узел документа (nil)';
+  sInvalidNodeParent = 'Узел %s не является дочерним узлом для %s';
   sInvalidNodePath   = 'Некорректный путь к узлу: %s';
   sInvalidValueType  = 'Элемент %s [%s] должен иметь тип ''%s''';
   sLookupTableIsFull = 'В массиве хэшей нет свободных мест';
@@ -295,6 +297,7 @@ resourcestring
   sReservedTypeError = 'Обнаружен недопустимый тип элемента';
   sTableItemNameRqrd = 'Для элементов таблиц необходимо указать не пустые имена';
   sTooManyChildItems = 'Достигнут предел дочерних элементов в %s';
+
 
   {$IFDEF CPU64BITS}
   sMaxDocSizeExceed  = 'Превышен максимальный размер SCL-документа';
@@ -531,7 +534,7 @@ begin
   if Node = nil then
     raise ESCLError.CreateRes(@sInvalidItemLink);
   if Node.FParent <> @Self then
-    raise ESCLError.CreateFmt('Узел %s не является дочерним узлом для %s', [Node.FName, FName]);
+    raise ESCLError.CreateResFmt(@sInvalidNodeParent, [Node.FName, FName]);
   var SCLArray := PSCLArray(FValue);
   SCLArray.FDocument.RemoveSubTree(Node);
   { Восстанавливаем связность оставшихся элементов }
@@ -1022,17 +1025,17 @@ const
   BoolStrings: array [Boolean] of string = ('false', 'true');
 begin
   case FType of
-    ntReserved:  Result := '#ERROR';
-    ntBinary:    Result := BinToHex(PBytes(@FValue)^);
-    ntBoolean:   Result := BoolStrings[Boolean(FValue)];
-    ntDateTime:  Result := DateTimeAsString;
-    ntFloat:     Result := DoubleToString(PDouble(@FValue)^);
-    ntInteger:   if FSubType = 0 then
-                   Result := IntToStr(FValue)
-                 else
-                   Result := IntToBaseTwo(FValue, FSubType);
-    ntNull:      Result := 'null';
-    ntString:    Result := PString(@FValue)^;
+    ntReserved: Result := '#ERROR';
+    ntBinary:   Result := BinToHex(PBytes(@FValue)^);
+    ntBoolean:  Result := BoolStrings[Boolean(FValue)];
+    ntDateTime: Result := DateTimeAsString;
+    ntFloat:    Result := DoubleToString(PDouble(@FValue)^);
+    ntInteger:  if FSubType = 0 then
+                  Result := IntToStr(FValue)
+                else
+                  Result := IntToBaseTwo(FValue, FSubType);
+    ntNull:     Result := 'null';
+    ntString:   Result := PString(@FValue)^;
     else raise ESCLError.CreateResFmt(@sConversionFailed, [FName, TypeName, sTypeName_String]);
   end;
 end;
@@ -1235,14 +1238,8 @@ end;
 
 procedure TSCLDocument.RemoveSubTree(Node: PSCLNode);
 begin
-  { Удаление корневого узла документа }
-  if Node = FRootNode then
-  begin
-    Clear;
-    Exit;
-  end;
   if (Node.FParent = nil) or (TSCLNode.PSCLArray(Node.Parent.FValue).FDocument <> Self) then
-    raise ESCLError.Create('Попытка удаления узла, не принадлежащего данному документу');
+    raise ESCLError.CreateRes(@sAlienDocumentNode);
   { Рекурсивно удаляем вложенные элементы }
   if Node.FType in [ntArray, ntTable] then
     for var Item in Node^ do

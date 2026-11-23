@@ -24,10 +24,11 @@ type
   TSCLParams = record
     Name: string;
     Comment: string;
-    State: SCLStateAttribute.TValueState;
+    State: TSCLValueState;
     InlineMode: Boolean;
     IsTimeZone: Boolean;
     NumberBase: TSCLNumberBase;
+    Precision: TSCLPrecision;
     StringType: TSCLStringType;
     constructor Create(const AName: string; const Attrs: TArray<TCustomAttribute>);
   end;
@@ -173,7 +174,7 @@ end;
 
 function GetChar(Node: PSCLNode): Char;
 begin
-  var Value := Node.AsString;
+  var Value := Node.VString;
   if Value.Length <> 1 then
     raise ESerializeError.CreateRes(@sCharacterRequired);
   Result := Value[1];
@@ -239,29 +240,27 @@ end;
 { TSCLParams }
 
 constructor TSCLParams.Create(const AName: string; const Attrs: TArray<TCustomAttribute>);
-const
-  IgnoreStates: array [Boolean] of SCLStateAttribute.TValueState = (vsDontWrite, vsIgnore);
 begin
   Self := Default(TSCLParams);
   Name := AName;
   for var Attribute in Attrs do
-    if Attribute is SCLNameAttribute then
+    if Attribute is SCLInfoAttribute then
     begin
-      Name := SCLNameAttribute(Attribute).Name;
-      if Name = '' then
-        raise ESerializeError.CreateRes(@sNodeNameRequired);
-    end else if Attribute is SCLBaseAttribute then
-      NumberBase := SCLBaseAttribute(Attribute).NumberBase
-    else if Attribute is SCLCommentAttribute then
-      Comment := SCLCommentAttribute(Attribute).Comment
-    else if Attribute is SCLStateAttribute then
-      State := SCLStateAttribute(Attribute).State
-    else if Attribute is SCLStringAttribute then
+      SCLInfoAttribute(Attribute).TrySetName(Name);
+      Comment := SCLInfoAttribute(Attribute).Comment;
+      State   := SCLInfoAttribute(Attribute).State;
+    end else if Attribute is SCLNumberAttribute then
+    begin
+      NumberBase := SCLNumberAttribute(Attribute).NumberBase;
+      Precision := SCLNumberAttribute(Attribute).Precision;
+    end else if Attribute is SCLStringAttribute then
       StringType := SCLStringAttribute(Attribute).StringType
     else if Attribute is SCLInlineAttribute then
       InlineMode := True
     else if Attribute is SCLTimeZoneAttribute then
       IsTimeZone := True;
+  if Name.IsEmpty then
+    raise ESerializeError.CreateRes(@sNodeNameRequired);
 end;
 
 { TSCLSerializer }
@@ -278,20 +277,20 @@ begin
   if ItemType.Handle = TypeInfo(Byte) then
   begin
     { Динамический массив байт читаем как байтовую строку }
-    var Bytes := Node.AsBytes;
+    var Bytes := Node.VBytes;
     var Count := Length(Bytes);
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
     Move(PByte(Bytes)^, PPointer(Data)^^, Count);
   end else if ItemType.Handle = TypeInfo(WideChar) then
   begin
     { Массивы символов читаем как строки }
-    var Chars := Node.AsString;
+    var Chars := Node.VString;
     var Count := Length(Chars);
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
     Move(PByte(Chars)^, PPointer(Data)^^, Count * SizeOf(Char));
   end else if ItemType.Handle = TypeInfo(AnsiChar) then
   begin
-    var Chars := AnsiString(Node.AsString);
+    var Chars := AnsiString(Node.VString);
     var Count := Length(Chars);
     DynArraySetLength(PPointer(Data)^, AType.Handle, 1, @Count);
     Move(PByte(Chars)^, PPointer(Data)^^, Count);
@@ -315,13 +314,13 @@ begin
   var LTypeInfo := AType.Handle;
   if LTypeInfo = TypeInfo(Boolean) then
   begin
-    PBoolean(Data)^ := Node.AsBoolean;
+    PBoolean(Data)^ := Node.VBoolean;
     Exit;
   end;
   var SearchName := AType.QualifiedName + '.';
   if GetEnumName(LTypeInfo, AType.AsOrdinal.MinValue).StartsWith(SearchName) then
-    SearchName := SearchName + Node.AsString
-  else SearchName := Node.AsString;
+    SearchName := SearchName + Node.VString
+  else SearchName := Node.VString;
   var EnumIndex := EnumItemIndex(SearchName, LTypeInfo);
   case LTypeInfo.TypeData.OrdType of
     otSByte, otUByte: PByte(Data)^ := Byte(EnumIndex);
@@ -334,27 +333,27 @@ class procedure TSCLSerializer.DecodeFloat(Node: PSCLNode; Data: Pointer; AType:
 begin
   var ATypeInfo := AType.Handle;
   if ATypeInfo = TypeInfo(TDateTime) then
-    PDateTime(Data)^ := Node.AsDateTime
+    PDateTime(Data)^ := Node.VDateTime
   else if ATypeInfo = TypeInfo(Comp) then
-    PInt64(Data)^ := Node.AsInteger
+    PInt64(Data)^ := Node.VInteger
   else if ATypeInfo = TypeInfo(Currency) then
-    PInt64(Data)^ := Node.AsInteger
+    PInt64(Data)^ := Node.VInteger
   else if ATypeInfo = TypeInfo(Extended) then
-    PExtended(Data)^ := Extended(Node.AsDouble)
+    PExtended(Data)^ := Extended(Node.VDouble)
   else if ATypeInfo = TypeInfo(Single) then
-    PSingle(Data)^ := Single(Node.AsDouble)
+    PSingle(Data)^ := Single(Node.VDouble)
   else
-    PDouble(Data)^ := Node.AsDouble;
+    PDouble(Data)^ := Node.VDouble;
 end;
 
 class procedure TSCLSerializer.DecodeInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  PInt64(Data)^ := Node.AsInteger;
+  PInt64(Data)^ := Node.VInteger;
 end;
 
 class procedure TSCLSerializer.DecodeInteger(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  var OrdinalValue := Int64Rec(Node.AsInteger).Lo;
+  var OrdinalValue := Int64Rec(Node.VInteger).Lo;
   case AType.AsOrdinal.OrdType of
     otSByte, otUByte: PByte(Data)^ := Byte(OrdinalValue);
     otSWord, otUWord: PWord(Data)^ := Word(OrdinalValue);
@@ -364,7 +363,7 @@ end;
 
 class procedure TSCLSerializer.DecodeLString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  PAnsiString(Data)^ := AnsiString(Node.AsString);
+  PAnsiString(Data)^ := AnsiString(Node.VString);
 end;
 
 class procedure TSCLSerializer.DecodeRecord(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
@@ -394,13 +393,13 @@ begin
     var NeedType := GetEnumName(TypeInfo, ItemType.AsOrdinal.MinValue).StartsWith(TypeName);
     for var Item in Node^ do
     begin
-      var ItemName := Item.AsString;
+      var ItemName := Item.VString;
       if NeedType then
         ItemName := TypeName + ItemName;
       SetBit(Data, EnumItemIndex(ItemName, TypeInfo));
     end;
   end else for var Item in Node^ do
-    SetBit(Data, Item.AsInteger);
+    SetBit(Data, Item.VInteger);
 end;
 
 class procedure TSCLSerializer.DecodeStaticArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
@@ -410,21 +409,21 @@ begin
   if ItemType.Handle = TypeInfo(Byte) then
   begin
     { Динамический массив байт читаем как байтовую строку }
-    var Bytes := Node.AsBytes;
+    var Bytes := Node.VBytes;
     var Count := Length(Bytes);
     if ArrayType.TotalElementCount <> Count then
       raise ESerializeError.CreateResFmt(@sArraySizeMismatch, [Count, ArrayType.TotalElementCount]);
     Move(PByte(Bytes)^, PByte(Data)^, Count);
   end else if ItemType.Handle = TypeInfo(WideChar) then
   begin
-    var Chars := Node.AsString;
+    var Chars := Node.VString;
     var Count := Length(Chars);
     if ArrayType.TotalElementCount <> Count then
       raise ESerializeError.CreateResFmt(@sArraySizeMismatch, [Count, ArrayType.TotalElementCount]);
     Move(PByte(Chars)^, PByte(Data)^, Count shl 1);
   end else if ItemType.Handle = TypeInfo(AnsiChar) then
   begin
-    var Chars := AnsiString(Node.AsString);
+    var Chars := AnsiString(Node.VString);
     var Count := Length(Chars);
     if ArrayType.TotalElementCount <> Count then
       raise ESerializeError.CreateResFmt(@sArraySizeMismatch, [Count, ArrayType.TotalElementCount]);
@@ -445,12 +444,12 @@ end;
 
 class procedure TSCLSerializer.DecodeString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  PShortString(Data)^ := ShortString(Node.AsString);
+  PShortString(Data)^ := ShortString(Node.VString);
 end;
 
 class procedure TSCLSerializer.DecodeUString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  PString(Data)^ := Node.AsString;
+  PString(Data)^ := Node.VString;
 end;
 
 class procedure TSCLSerializer.DecodeWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
@@ -460,7 +459,7 @@ end;
 
 class procedure TSCLSerializer.DecodeWString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  PWideString(Data)^ := WideString(Node.AsString);
+  PWideString(Data)^ := WideString(Node.VString);
 end;
 
 procedure TSCLSerializer.Deserialize<T>(RootNode: PSCLNode; out Value: T; const AName: string);
@@ -480,7 +479,7 @@ end;
 
 class procedure TSCLSerializer.EncodeAnsiChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  Node.AsString := string(PAnsiChar(Data)^);
+  Node.VString := string(PAnsiChar(Data)^);
 end;
 
 class procedure TSCLSerializer.EncodeDynamycArray(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
@@ -490,12 +489,12 @@ begin
   var ItemData := PByte(PPointer(Data)^);
   if ItemType.Handle = TypeInfo(Byte) then
     { Массив байт пишем в бинарное значение }
-    Node.AsBytes := TBytes.Create(ItemData, DynArraySize(ItemData))
+    Node.VBytes := TBytes.Create(ItemData, DynArraySize(ItemData))
   else if ItemType.Handle = TypeInfo(WideChar) then
     { Массивы символов пишем в обычную строку }
-    Node.AsString := StringFromCharArray(PWideChar(ItemData), DynArraySize(ItemData))
+    Node.VString := StringFromCharArray(PWideChar(ItemData), DynArraySize(ItemData))
   else if ItemType.Handle = TypeInfo(AnsiChar) then
-    Node.AsString := StringFromCharArray(PAnsiChar(ItemData), DynArraySize(ItemData))
+    Node.VString := StringFromCharArray(PAnsiChar(ItemData), DynArraySize(ItemData))
   else
   begin
     Node.MakeParent(False, Params.InlineMode and (Node.Parent <> nil));
@@ -512,7 +511,7 @@ class procedure TSCLSerializer.EncodeEnumeration(Node: PSCLNode; Data: Pointer; 
 begin
   if AType.Handle = TypeInfo(Boolean) then
   begin
-    Node.AsBoolean := PBoolean(Data)^;
+    Node.VBoolean := PBoolean(Data)^;
     Exit;
   end;
   var ValueName: string;
@@ -535,19 +534,19 @@ begin
   var ATypeInfo := AType.Handle;
   if ATypeInfo = TypeInfo(TDateTime) then
   begin
-    Node.AsDateTime := PDateTime(Data)^;
+    Node.VDateTime := PDateTime(Data)^;
     if Params.IsTimeZone then
       Node.TimeOffset := Round(TTimeZone.Local.GetUtcOffset(Now).TotalMinutes);
   end else if ATypeInfo = TypeInfo(Comp) then
-    Node.AsInteger := PInt64(Data)^
+    Node.VInteger := PInt64(Data)^
   else if ATypeInfo = TypeInfo(Currency) then
-    Node.AsInteger := PInt64(Data)^
+    Node.VInteger := PInt64(Data)^
   else if ATypeInfo = TypeInfo(Extended) then
-    Node.AsDouble := Double(PExtended(Data)^)
+    Node.VDouble := Double(PExtended(Data)^)
   else if ATypeInfo = TypeInfo(Single) then
-    Node.AsDouble := Double(PSingle(Data)^)
+    Node.VDouble := Double(PSingle(Data)^)
   else
-    Node.AsDouble := PDouble(Data)^;
+    Node.VDouble := PDouble(Data)^;
 end;
 
 class procedure TSCLSerializer.EncodeInt64(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
@@ -619,12 +618,12 @@ begin
   var ItemType := ArrayType.ElementType;
   if ItemType.Handle = TypeInfo(Byte) then
     { Массив байт пишем в бинарное значение }
-    Node.AsBytes := TBytes.Create(Data, ArrayType.TotalElementCount)
+    Node.VBytes := TBytes.Create(Data, ArrayType.TotalElementCount)
   else if ItemType.Handle = TypeInfo(WideChar) then
     { Массивы символов пишем в обычную строку }
-    Node.AsString := StringFromCharArray(PWideChar(Data), ArrayType.TotalElementCount)
+    Node.VString := StringFromCharArray(PWideChar(Data), ArrayType.TotalElementCount)
   else if ItemType.Handle = TypeInfo(AnsiChar) then
-    Node.AsString := StringFromCharArray(PAnsiChar(Data), ArrayType.TotalElementCount)
+    Node.VString := StringFromCharArray(PAnsiChar(Data), ArrayType.TotalElementCount)
   else
   begin
     { Иначе записываем массив поэлементно }
@@ -651,7 +650,7 @@ end;
 
 class procedure TSCLSerializer.EncodeWideChar(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);
 begin
-  Node.AsString := string(PWideChar(Data)^);
+  Node.VString := string(PWideChar(Data)^);
 end;
 
 class procedure TSCLSerializer.EncodeWString(Node: PSCLNode; Data: Pointer; AType: TRttiType; Params: PSCLParams);

@@ -70,7 +70,7 @@ end;
 | `ntDateTime` | Дата/время |
 | `ntFloat` | Число с плавающей точкой |
 | `ntInteger` | Целое число |
-| `ntNull` | Null (`~`) |
+| `ntNull` | Null (`null`) |
 | `ntString` | Строка |
 | `ntArray` | Массив |
 | `ntTable` | Таблица (словарь) |
