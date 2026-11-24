@@ -17,10 +17,10 @@ type
     FComment: string;
     FState: TSCLValueState;
   public
-    constructor Create(const AComment: string = string.Empty); overload;
-    constructor Create(const AName: string; const AComment: string = string.Empty); overload;
-    constructor Create(const AName: string; AState: TSCLValueState = vsDefault; const AComment: string = string.Empty); overload;
-    constructor Create(AState: TSCLValueState = vsDefault; const AComment: string = string.Empty); overload;
+    constructor Create(const AComment: string); overload;
+    constructor Create(const AName, AComment: string); overload;
+    constructor Create(const AName: string; AState: TSCLValueState; const AComment: string = string.Empty); overload;
+    constructor Create(AState: TSCLValueState; const AComment: string = string.Empty); overload;
     procedure TrySetName(var Name: string);
     property Comment: string read FComment;
     property State: TSCLValueState read FState;
